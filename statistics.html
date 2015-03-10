@@ -1,0 +1,164 @@
+<html>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
+<div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+    <div class="container">
+        <div class="navbar-header">
+        	<button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+            	<span class="sr-only">Toggle navigation</span>
+            	<span class="icon-bar"></span>
+            	<span class="icon-bar"></span>
+            	<span class="icon-bar"></span>
+          	</button>
+          	<a class="navbar-brand" href="index.html">Andrew Resnikoff</a>
+        </div>
+        <div class="navbar-collapse collapse">
+      		<ul class="nav navbar-nav navbar-right">
+        		<li><a href="aboutMe.html">About Me</a></li>
+        		<li class="dropdown">
+          			<a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+          				Mathematics
+          				<span class="caret"></span>
+          			</a>
+          			<ul class="dropdown-menu" role="menu">
+            			<li><a href="OR.html">Operations Research</a></li>
+            			<li class="divider"></li>
+            			<li><a href="#">Separated link</a></li>
+          			</ul>
+        		</li>
+        		<li class="dropdown">
+          			<a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+          				Statistics
+          				<span class="caret"></span>
+          			</a>
+          			<ul class="dropdown-menu" role="menu">
+            			<li><a href="statistics.html">Data Analysis</a></li>
+            			<li class="divider"></li>
+            			<li><a href="#DataMining">Data Mining</a></li>
+          			</ul>
+        		</li>
+        		<li class="dropdown">
+          			<a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
+          				Computer Science
+          				<span class="caret"></span>
+          			</a>
+          			<ul class="dropdown-menu" role="menu">
+            			<li><a href="CS.html">iOS Development</a></li>
+            			<li class="divider"></li>
+            			<li><a href="CS.html#python">python Development</a></li>
+          			</ul>
+        		</li>
+      		</ul>
+        </div><!--/.navbar-collapse -->
+     </div>
+</div>
+
+<h1>&nbsp;</h1>
+
+<div class="container theme-showcase" role="main">
+  <!-- Main jumbotron for a primary marketing message or call to action -->
+  <div class="jumbotron">
+    <h3>Statistics <small>Data Analysis</small></h3>
+  </div>
+
+  <div class="panel panel-default">
+    <!-- Default panel contents -->
+    <div class="panel-heading">Analysis of Diamond Pricing</div>
+      <div class="panel-body">
+        <p><b>Abstract:</b></p>
+        <p>
+        In today's society, diamonds are seen as a luxury item. They are a very important part of popular jewelry. Probably because of how difficult it is to mine diamonds, there is only a small group of companies that participate in most of the diamond trade. These companies can then set diamond whatever prices they like, making diamonds incredibly expensive. Through this investigation, we hoped to get a better understanding of how diamonds are priced. From 285 diamond samples we used multivariate linear regression to find a relationship between 10 different predictor variables and the price of a diamond. In our conclusions, we found that not all of these predictors were significant. Interestingly, while the weight in carats of a diamond was significant we concluded that increasing the weight of a diamond corresponds to a decrease in price. Based on our analysis, increasing the width of a diamond will correspond to an increase in price.</p>
+      </div>
+    <div class="panel-footer">
+      <div class="row">
+          <div class="col-xs-8 divider text-center">
+            <div class="col-xs-12 col-sm-4 emphasis">
+              <p><a class="btn btn-lg btn-success" href="DA-diamonds.pdf" role="button">View Paper</a></p>
+            </div>
+            <div class="col-xs-12 col-sm-4 emphasis">
+              <p><a class="btn btn-lg btn-success" href="DA-diamonds.R" role="button">View Code</a></p>
+            </div>
+          </div>
+      </div>
+    </div>
+  </div>
+
+   <div class="panel panel-default">
+    <!-- Default panel contents -->
+    <div class="panel-heading">Analysis of Blog Traffic</div>
+      <div class="panel-body">
+        <p><b>Abstract:</b></p>
+        <p>
+        Since blogging has become popular, it is interesting to see how the number of comments vary for different blog posts so that we can understand what drives web traffic to certain posts rather than others. In this investigation, multivariate linear regression was used to determine what affects the number of comments a blog post gets 24 hours after a given basetime. Starting with a sample of 668 blog posts and 27 potential predictors, we eliminated outliers and insignificant variables to build a final model. In this model, we discovered that certain words can either cause an expected increase or decrease in the number of comments in those 24 hours. We also found that posts with more comments 24 hours before the basetime (for the source average or the post itself) are expected to have more comments after the basetime.</p>
+      </div>
+    <div class="panel-footer">
+      <div class="row">
+          <div class="col-xs-8 divider text-center">
+            <div class="col-xs-12 col-sm-4 emphasis">
+              <p><a class="btn btn-lg btn-success" href="DA-blogging.pdf" role="button">View Paper</a></p>
+            </div>
+            <div class="col-xs-12 col-sm-4 emphasis">
+              <p><a class="btn btn-lg btn-success" href="DA-blogging.R" role="button">View Code</a></p>
+            </div>
+          </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel panel-default">
+    <!-- Default panel contents -->
+    <div class="panel-heading">Analysis of Political Movements</div>
+      <div class="panel-body">
+        <p><b>Abstract:</b></p>
+        <p>
+        As times change, ideas change with it. As new ideas are put forward, it is often difficult to change the minds of those around you. This analysis will look at many different political movements and how whether or not the movement was non violent ultimately affected the end result. Through this investigation, we aim to determine whether non violent movements are more likely to be successful ones and which factors are significant in determining whether violent and non violent movement will be successful.</p>
+      </div>
+    <div class="panel-footer">
+      <div class="row">
+          <div class="col-xs-8 divider text-center">
+            <div class="col-xs-12 col-sm-4 emphasis">
+              <p><a class="btn btn-lg btn-success" href="DA-nonviolence.pdf" role="button">View Paper</a></p>
+            </div>
+            <div class="col-xs-12 col-sm-4 emphasis">
+              <p><a class="btn btn-lg btn-success" href="DA-nonviolence.RMD" role="button">View Code</a></p>
+            </div>
+          </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<a name="DataMining"></a>
+<div class="container theme-showcase" role="main">
+  <!-- Main jumbotron for a primary marketing message or call to action -->
+  <div class="jumbotron">
+    <h3>Statistics<small>Data Mining</small></h3>
+  </div>
+
+  <div class="panel panel-default">
+    <!-- Default panel contents -->
+    <div class="panel-heading">Data Mining</div>
+      <div class="panel-body">
+        <p><b>Abstract:</b></p>
+        <p>
+        Data Mining
+        </p>
+      </div>
+    <div class="panel-footer">
+      <div class="row">
+          <div class="col-xs-8 divider text-center">
+            <div class="col-xs-12 col-sm-4 emphasis">
+              <p><a class="btn btn-lg btn-success" href="" role="button">View Paper</a></p>
+            </div>
+            <div class="col-xs-12 col-sm-4 emphasis">
+              <p><a class="btn btn-lg btn-success" href="" role="button">View Code</a></p>
+            </div>
+          </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+</html>
