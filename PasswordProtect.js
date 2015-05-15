@@ -9,12 +9,6 @@ String.prototype.hashCode = function() {
   return hash;
 };
 
-$( "div" ).click(function() {
-  print("here\n")
-  alert( "Handler for .click() called." );
-});
-
 $(".protect").click(function() {
-  print("here\n")
-  alert( "Handler for .click() called." );
+  p = prompt("This document is password protected. Please enter the password to continue.")
 });
