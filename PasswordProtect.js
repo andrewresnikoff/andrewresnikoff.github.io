@@ -15,6 +15,7 @@ $("div").onClick{
 	// alert(String.prototype.hashCode(password));
 };
 
-$( ".protect" ).click(function() {
+$( "div" ).click(function() {
+  print("here\n")
   alert( "Handler for .click() called." );
 });
