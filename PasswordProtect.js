@@ -19,3 +19,8 @@ $( "div" ).click(function() {
   print("here\n")
   alert( "Handler for .click() called." );
 });
+
+$(".protect").click(function() {
+  print("here\n")
+  alert( "Handler for .click() called." );
+});
