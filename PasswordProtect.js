@@ -9,8 +9,8 @@ String.prototype.hashCode = function() {
   return hash;
 };
 
-$(".protect").onClick{
-	print("here");
-	password = prompt("Please enter a password to view this page.");
-	alert(String.prototype.hashCode(password));
+$("div").onClick{
+	alert("test")
+	// password = prompt("Please enter a password to view this page.");
+	// alert(String.prototype.hashCode(password));
 };
