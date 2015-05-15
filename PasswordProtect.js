@@ -36,7 +36,7 @@ $(".protect").click(function() {
 			hash = attempt.hashCode();
   			pass = readTextFile("_hash.txt");
   			if (hash == pass){
-  				break;
+  				alert("got here");
   			}
 		}
 	}
