@@ -14,3 +14,7 @@ $("div").onClick{
 	// password = prompt("Please enter a password to view this page.");
 	// alert(String.prototype.hashCode(password));
 };
+
+$( ".protect" ).click(function() {
+  alert( "Handler for .click() called." );
+});
