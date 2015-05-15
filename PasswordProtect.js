@@ -1,3 +1,5 @@
+var __PROTECT__ = true
+
 String.prototype.hashCode = function() {
   var hash = 0, i, chr, len;
   if (this.length == 0) return hash;
@@ -9,6 +11,32 @@ String.prototype.hashCode = function() {
   return hash;
 };
 
+function readTextFile(file)
+{
+    var rawFile = new XMLHttpRequest();
+    rawFile.open("GET", file, false);
+    rawFile.onreadystatechange = function ()
+    {
+        if(rawFile.readyState === 4)
+        {
+            if(rawFile.status === 200 || rawFile.status == 0)
+            {
+                var allText = rawFile.responseText;
+                alert(allText);
+            }
+        }
+    }
+    rawFile.send(null);
+}
+
 $(".protect").click(function() {
-  p = prompt("This document is password protected. Please enter the password to continue.")
+	if (__PROTECT__){
+		attempt = prompt("This document is password protected. Please enter the password to continue.");
+  		hash = attempt.hashCode();
+  		pass = readTextFile("_hash.txt");
+  		return (hash == pass)
+	}
+	else{
+		return true;
+	}
 });
