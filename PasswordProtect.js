@@ -32,11 +32,15 @@ function readTextFile(file)
 $(".protect").click(function() {
 	if (__PROTECT__){
 		attempt = prompt("This document is password protected. Please enter the password to continue.");
-  		hash = attempt.hashCode();
-  		pass = readTextFile("_hash.txt");
-  		return (hash == pass)
+		if (attempt){
+			hash = attempt.hashCode();
+  			pass = readTextFile("_hash.txt");
+  			if (hash == pass){
+  				break;
+  			}
+		}
 	}
 	else{
-		return true;
+		return false;
 	}
 });
