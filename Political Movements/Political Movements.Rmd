@@ -1,0 +1,298 @@
+---
+title: 'Advanced Data Analysis: Exam 1'
+author: "Andrew Resnikoff"
+date: "aresniko"
+output: pdf_document
+---
+
+```{r Data and Libraries,echo=FALSE,warning=FALSE,message=FALSE}
+# import data
+navc<-read.csv("~/Desktop/36402/Exam 1/navc.csv")
+library(mgcv)
+library(glmnet)
+
+# remove na
+navc.clean<-na.omit(navc)
+
+# recode partial successes
+navc.clean$outcome[which(navc.clean$outcome == .5)] = 1 # partial success is still success
+```
+
+# Introduction
+
+## Background
+\paragraph{}
+As times change, ideas change with it. As new ideas are put forward, it is often difficult to change the minds of those around you. This analysis will look at many different political movements and how whether or not the movement was non violent ultimately affected the end result. Through this investigation, we aim to determine whether non violent movements are more likely to be successful ones and which factors are significant in determining whether violent and non violent movement will be successful.
+
+## Data
+\paragraph{}
+We are given a dataset with 323 observations of the following variables: whether the movement was successful, partially successful or a failure (response), the name, country and year of the movement, whether the movement was nonviolent, a measure of how democratic the government the movement takes place in was, whether the government was under sanctions or was recieving aid, whether foreign governments supported the movement, whether the government used violence to repress the movement, whether military and police forces sided with the movement and the duration of the movement in days.
+\paragraph{}
+We recode the outcome variable (whether the movement was successful) to be successful even when it has been classified as a partial success. We also remove all observations that contain NA, which leaves us with 267 complete observations.
+
+\newpage
+
+# Models
+
+We begin this investigation by fitting a general additive model to our dataset. The variables campaign and country are removed by default. The variables year, democracy and duration are all smoothed using splines. 
+
+## General Additive Model
+```{r gam}
+gam.model<-gam(outcome~s(year)+nonviol+s(democracy)
+                  +sanctions+aid+support+viol.repress
+                  +defect+s(duration),data=navc.clean,family="binomial")
+```
+
+```{r gam summary,echo=FALSE,message=FALSE}
+summary(gam.model)
+```
+: Model Summary
+
++-----------------+---------------+--------------------+-------------+
+| Variable Name   | Coefficient   | Standard Error     |P-Value      |
++=================+===============+====================+=============+
+|(intercept)      | -.200         | .525               | .702        |
++-----------------+---------------+--------------------+-------------+
+| nonviol         | 2.169         | .407               | 0           |
++-----------------+---------------+--------------------+-------------+
+| sanctions       | .040          |  .445              |.928         |
++-----------------+---------------+--------------------+-------------+
+| aid             | -.019         | .330               |.995         |
++-----------------+---------------+--------------------+-------------+
+| support         | .759          | .397               |.056         |
++-----------------+---------------+--------------------+-------------+
+| viol.repress    | -.892         | .516               |.084         |
++-----------------+---------------+--------------------+-------------+
+| defect          |  1.015        | .369               |.006         |
++-----------------+---------------+--------------------+-------------+
+
+### Binary Predictor Variables
+Since the coefficients of the non smoothed terms are essentially the effects of a logistic regression on these variables, we can summarize the effects of each of these terms holding all others constant.
+
+\begin{description}
+\item[nonviol] A coefficient of 2.169 implies that a movement that uses nonviolence is $e^{2.169} = 8.75$ times more likely to succeed than a movement that is violent.
+
+\item[sanctions] A coefficient of .4 implies that a movement under a government under international sanctions is $e^{.4} = 1.492$ times more likely to succeed than one that is not.
+
+\item[aid] A coefficient of -.019 implies that a movement under a government who recieved aid from other countries to deal with the movement is $e^{-.019} = .981$ times as likely to succeed than one that is not.
+
+\item[support] A coefficient of .759 implies that a movement that recieved aid from foreign governments is $e^{.759} = 2.136$ times as likely to succeed than one that is not.
+
+\item[viol.repress] A coefficient of -.892 implies that a movement that is met with violent repression from the government is $e^{-.892} = .410$ times as likely to succeed than one that is not.
+
+\item[defect] A coefficient of 1.015 implies that a movement which is supported by a substantial portion of the police and military is $e^{1.015} = 2.759$ times as likely to succeed as one that is not.
+\end{description}
+
+### Continuous Predictor Variables
+
+```{r gam smooth plots,echo=FALSE}
+plot(gam.model,scale=0,se=2,shade=TRUE,pages=1)
+```
+
+We can assess the relationship between the continuous predictor variables and the response by looking at the plots of the smoothing splines used in our model. 
+
+\begin{description}
+
+\item[year] The spline function estimated for the variable year has 1 effective degree of freedom and looks to be linear. This implies that as the year increases, movements are in general more likely to succeed. It is important to note that the spline takes on negative values and positive values, meaning that movements taking place before a certain year (around 1960 or 1970) were less likely to succeed and movements taking place after this year are more likely to succeed. 
+
+\item[duration] The spline function estimated for the variable duration has 1 effective degree of freedom and looks to be linear. This implies that the more days a movement goes on for, the more likely it is to survive. Since the value of the spline function is always positive, this means that a movement does not have to be going for a certain number of days before it becomes more likely to be successful.
+
+\item[democracy] The spline function estimated for the variable democracy has 5.57 effective degrees of freedom and is not linear. The function oscillates, so different values for democracy have very different effects on the outcome.
+\end{description}
+
+## Violence vs. Non Violence
+
+To get a better understanding of how the outcome is affected by a movement being violent or non-violent, we can build models on the seperated datasets and see how they differ.
+
+```{r split data set}
+violent<-navc.clean[which(navc.clean$nonviol == 0),]
+nonviolent<-navc.clean[which(navc.clean$nonviol == 1),]
+
+gam.violent<-gam(outcome~s(year)+s(democracy)
+                  +sanctions+aid+support+viol.repress
+                  +defect+s(duration),data=violent,family="binomial")
+
+gam.nonviolent<-gam(outcome~s(year)+s(democracy)
+                  +sanctions+aid+support+viol.repress
+                  +defect+s(duration),data=nonviolent,family="binomial")
+```
+
+### Violent Data Set Summary
+```{r,echo=FALSE,message=FALSE}
+summary(gam.violent)
+```
+
+### Violent Data Set Plot
+
+```{r,echo=FALSE}
+plot(gam.violent,scale=0,se=2,shade=TRUE,pages=1)
+```
+
+### Non Violent Data Set Summary
+```{r,echo=FALSE,message=FALSE}
+summary(gam.nonviolent)
+```
+
+### Non Violent Data Set Plot
+
+```{r,echo=FALSE}
+plot(gam.nonviolent,scale=0,se=2,shade=TRUE,pages=1)
+```
+
+\paragraph{}
+Looking at these two models, we can see many discrepencies in the way the two models behave. In violent movements, the government being under sanctions during the movement improves the chances of success, while in non violent movements it decreases the chances. Being a more recent year or the movement taking a longer duration will also improve chances of success in violent movements. In non violent movements, the year and duration have a mostly constant effect (an increase year seems to decrease chances of success slightly). The effect of democracy is also very different. In violent movements, we see an effect very similar to the initial models. In non violent movements, we see a linear relationship between democracy and success. A non violent movement under a stronger democracy is more likely to be successful.
+
+\paragraph{}
+There are also some similarities between the two models. The government recieving aid from foreign government has a negative effect on the chance of success in both violent and non violent movements. Recieving aid from foreign governments and having the support of the police and military will increase the chances of success (although the effect is larger in non violent movements, but this may just be because of the scale of other variables.) A government violently repressing a movement will also decrease the chances of success for both types of movements (again the effect is larger in non violent movements.)
+
+## Model Validation
+
+### Cross Validation
+\paragraph{}
+We can use cross validation to determine the percentage of correct guesses that our models make. This seems to be the best way to see how well our models actaully perform against test data. Looking at the percentage of correct guesses our models make will tell us whether our models actually predict accurately.
+
+```{r Cross validation,echo=FALSE}
+# taken from chapter 3 of textbook with some edits for estimating
+cv.gam<-function(data,formulae,nfolds){
+  data<-na.omit(data)
+  formulae<-sapply(formulae,as.formula)
+  response.name <- function(formula) { all.vars(formula)[1] }
+  responses <- sapply(formulae, response.name)
+  n <- nrow(data)
+  fold.labels <- sample(rep(1:nfolds, length.out=n))
+  percents <- matrix(NA, nrow=nfolds, ncol=length(formulae))
+  colnames <- as.character(formulae)
+  for (fold in 1:nfolds) {
+    test.rows <- which(fold.labels == fold)
+    train <- data[-test.rows,]
+    test <- data[test.rows,]
+    for (form in 1:length(formulae)) {
+      current.model <- gam(formula=formulae[[form]], data=train,family = "binomial")
+      predictions <- predict.gam(current.model, newdata=test,type="response")
+      classifications <- ifelse(predictions > .5 ,1 ,0)
+      test.responses <- test[,responses[form]]
+      matrix<-table(test.responses,classifications,dnn=c("reality","prediction"))
+      percent<-100*signif(sum(diag(matrix))/sum(matrix),3)
+      percents[fold, form] <- mean((test.responses - predictions)^2)
+    }
+  }
+  return(colMeans(percents))
+}
+```
+
+```{r,cache=TRUE}
+cv.gam(navc.clean,"outcome~s(year)+nonviol+s(democracy)
+                  +sanctions+aid+support+viol.repress
+                  +defect+s(duration)",nrow(navc.clean))
+
+cv.gam(violent,"outcome~s(year)+s(democracy)
+                  +sanctions+aid+support+viol.repress
+                  +defect+s(duration)",nrow(violent))
+
+cv.gam(nonviolent,"outcome~s(year)+s(democracy)
+                  +sanctions+aid+support+viol.repress
+                  +defect+s(duration)",nrow(nonviolent))
+```
+
+Our cross-validated percent of correct guesses for the initial model is 19.91\%.
+
+Our cross-validated percent of correct guesses for the violent model is 22.64\%.
+
+Our cross-validated percent of correct guesses for the non-violent model is 15.46\%.
+\paragraph{}
+Notice that these numbers are very low in terms of the percentage they get correct. About 1 out of 5 predictions is correct when we build a model on all of the data. When we seperate the data into violent and non violent movements, we do much better.  On the whole dataset, we average about 53 total correct guesses. When violent and non violent movements are split, we average about 39 correct guesses on the violent data and about 14 correct guesses on the non violent data, a total of 54 correct guesses. While this isn't much better, it means that seperating the data does help the models performance (especially for violent movements.) 
+
+### Observed Frequency Vs. Predicted Probability Plots
+
+\paragraph{}
+
+The observed frequency vs. predicted probability plots help us ensure that our models behave as expected. We expect that about $n\%$ of data observations to have their outcome correctly predicted when the predicted probability for those observations is $n\%$.
+
+```{r ,echo=FALSE}
+# Taken from hw6 solutions
+frequency.vs.probability <- function(p.lower,p.increment=0.01,model,events) {
+  fitted.probs <- fitted(model)
+  indices <- (fitted.probs >= p.lower) & (fitted.probs < p.lower+p.increment)
+  ave.prob <- mean(fitted.probs[indices])
+  frequency <- mean(events[indices])
+  individual.vars <- fitted.probs*(1-fitted.probs)
+  var.of.average <- sum(individual.vars)/(sum(indices)^2)
+  se <- sqrt(var.of.average)
+  out <- list(frequency=frequency,ave.prob=ave.prob,se=se)
+  return(out)
+}
+
+# taken from hw6 solutions
+f.vs.p <- sapply(0:9/10,frequency.vs.probability,p.increment=0.1,
+          model=gam.model, events=navc.clean$outcome)
+
+# taken from hw6 solutions
+f.vs.p <- data.frame(frequency=unlist(f.vs.p["frequency",]),
+                      ave.prob=unlist(f.vs.p["ave.prob",]),
+                            se=unlist(f.vs.p["se",]))
+
+plot(frequency~ave.prob, data=f.vs.p, xlab="Predicted probabilities",
+     ylab="Observed frequencies", xlim=c(0,1), ylim=c(0,1),main="All Data")
+abline(0,1,col="darkgrey")
+segments(x0=f.vs.p$ave.prob,y0=f.vs.p$ave.prob-1.96*f.vs.p$se,
+y1=f.vs.p$ave.prob+1.96*f.vs.p$se)
+
+f.vs.p <- sapply(0:9/10,frequency.vs.probability,p.increment=0.1,
+          model=gam.nonviolent, events=nonviolent$outcome)
+
+f.vs.p <- data.frame(frequency=unlist(f.vs.p["frequency",]),
+                      ave.prob=unlist(f.vs.p["ave.prob",]),
+                            se=unlist(f.vs.p["se",]))
+
+plot(frequency~ave.prob, data=f.vs.p, xlab="Predicted probabilities",
+     ylab="Observed frequencies", xlim=c(0,1), ylim=c(0,1),main="Non Violent Data")
+abline(0,1,col="darkgrey")
+segments(x0=f.vs.p$ave.prob,y0=f.vs.p$ave.prob-1.96*f.vs.p$se,
+y1=f.vs.p$ave.prob+1.96*f.vs.p$se)
+
+f.vs.p <- sapply(0:9/10,frequency.vs.probability,p.increment=0.1,
+          model=gam.violent, events=violent$outcome)
+
+f.vs.p <- data.frame(frequency=unlist(f.vs.p["frequency",]),
+                      ave.prob=unlist(f.vs.p["ave.prob",]),
+                            se=unlist(f.vs.p["se",]))
+
+plot(frequency~ave.prob, data=f.vs.p, xlab="Predicted probabilities",
+     ylab="Observed frequencies", xlim=c(0,1), ylim=c(0,1),main="Violent Data")
+abline(0,1,col="darkgrey")
+segments(x0=f.vs.p$ave.prob,y0=f.vs.p$ave.prob-1.96*f.vs.p$se,
+y1=f.vs.p$ave.prob+1.96*f.vs.p$se)
+```
+
+\paragraph{}
+From the Observed frequencies vs. Predicted probabilities plots, we see that the models built on all of the data and the violent data behave as expected. The plot built from the non violent data, however, does not really line up as we would expect.
+
+## Final Model
+
+\paragraph{}
+It seems better in this case to move forward with the split model. While the Observed frequencies vs. Predicted probabilities plot for the non violent data does not seem to match up with our assumptions, the two seperate models give us a much better idea as to what affects the outcome of a movement when it is violent and when it is nonviolent. 
+
+\newpage
+
+# Results
+
+\paragraph{}
+
+From our initial model, it is evident that non violent movements are, in general, more successful than violent movements. This is made evident by the intercept coefficient of 23.699 in the nonviolent model. This value is the log odds of a non violent company being successful. Keep in mind, this implies that the probability of success for a nonviolent movement in general is about $e^{23.699} = 19604010508$. While we know that this is not a realistic probability, it speaks to the idea that being a non violent movement gives a much better chance of a successful outcome. Comparing this to the intercept coefficient of $e^{-0.34362} = .7091984$ for violent movements, despite the fact that the coefficients of these models are on different scales, we see this difference is very significant. When we add on the fact that in the initial model, we have a positive coefficient for the nonviol variable, we can conclude that non violent movements are more likely to be successful.
+
+\paragraph{}
+
+In both models (and the initial model), the coefficient of violent repression is negative. This implies that movements that are met with violent repression by their government are less likely to succeed. 
+
+\paragraph{}
+
+The effect of aid and support on both violent and non violent movements is as you would expect. A government that recieves foreign aid to supress the movement in both types of movement decreases the chances of success of that movement. When the movement, and not the government, recieves that foreign aid instead, the movement becomes more likely. It is interesting to note that in both the violent and non violent models, the movement recieving foreign aid does more to increase the chances of a successful outcome than the government recieving foreign aid does to decrease the chances of a successful outcome (as suggested by the fact that the coefficient for support is more positive than the coefficient for aid is negative in both model summaries.)
+
+\paragraph{}
+
+From the plot of the estimated spline for the democracy variable in the non violent model, we see a clearly defined  relationship between the level of a democracy of a government and the probability of success of a non violent momement. This relationship is linear, and appears to cross the line $y = 0$ at a democracy value of about -3. What this means, is that not only can we say that the more democractic a country is, the more likely that a non violent movement has a successful outcome but also that (holding all other factors constant) movements under a government with a democracy value of less than -3 will be less likely to succeed and movements under a government with a democracy value of more than -3 will be more likely to succeed (as when the estimate spline function takes a value of 0 it has no effect on the chances of success, and positive and negative values will increase and decrease chances of success respectively.)
+
+\paragraph{}
+
+In regards to how violent and non violent movements are affected by the level of democracy of the government, we see significant differences between the two types of movements. As explained above, in non violent movements, there is a positive linear relationship between the level of democracy and the chances of success. In violent movements, the relationship between democracy and chances of success oscillates. Since the estimated spline function is centered and close to zero, it seems like its possible that the chances of success for a violent movement don't really depend on how democratic the government is.
+

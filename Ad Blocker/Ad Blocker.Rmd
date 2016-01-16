@@ -1,0 +1,443 @@
+---
+title: 'Ad Blocker'
+author: "Andrew Resnikoff"
+date: "May 8th, 2015"
+output: pdf_document
+---
+
+```{r Data and Libraries,echo=FALSE,message=FALSE,warning=FALSE}
+load("~/Desktop/Data Mining/Final Project/images.RData")
+library(MASS)
+library(class)
+library(knitr)
+library(glmnet)
+library(randomForest)
+library(ada)
+names(images.train) = gsub('[*+]','_',names(images.train))
+names(images.test) = gsub('[*+]','_',names(images.test))
+names(images.train) = gsub('[*-]','_',names(images.train))
+names(images.test) = gsub('[*-]','_',names(images.test))
+names(images.train) = gsub('[*?]','_',names(images.train))
+names(images.test) = gsub('[*?]','_',names(images.test))
+```
+
+\section{Introduction}
+
+\subsection{Background}
+
+Many popular websites use advertisements to generate revenue for the site. Some users would prefer to use these sites without having to look at these advertisements, so they employ an "ad-blocker" to remove these advertisements from the page. Through this analysis, we aim to build a model that can successfully determine which images on a page are ads. Using this model, we can predict whether or not an image is an advertisement (and an actual ad blocking service could then actually block the image on the site.)
+
+\subsection{Data}
+
+To build this model, we are given a training data set of 1359 images. Each of these observations has values for variables such as the image width, height, name and, most importantly, whether or not it is an advertisement.  
+
+\section{Unsupervised Analysis}
+
+We begin our investigation by performing unsupervised analysis. This analysis will give us a better understanding of the underlying structure of the data.
+
+\subsection{Choosing $k$}
+
+The first step in unsupervised analysis is to choose a value for $k$, the number of groupings of the data we would like to see. 
+
+We can use Principal Components Analysis to view the proportion of variance explained in the image data for varied $k$, the number of component directions.
+
+
+```{r PCA,echo=FALSE,cache=TRUE,fig.height=3}
+# create matrix for prcomp
+X<-as.matrix(images.train[,2:ncol(images.train)])
+# store prcomp object
+a<-prcomp(X,center=TRUE,scale=FALSE)
+# principal component directions
+dirs<-a$rotation
+# principal component scores
+scores<-a$x
+# calculate the proportion of variance explained for the data
+d<-a$sdev
+pv<-cumsum(d^2)/sum(d^2)
+
+plot(1:10,pv[1:10],type="b",ylim=c(0,1),
+     xlab="Number of component directions",
+     ylab="Proportion of variance explained")
+```
+
+Notice that essentially all the variance is explained for the image data by two factors. This suggests that $k = 2$.
+
+To confirm this value of $k$, we can look at the CH index. 
+
+```{r CH Index, echo=FALSE,cache=TRUE,fig.height=3}
+# calculates CH index
+ch.index = function(x, kmax, iter.max=100, nstart=10, algorithm="Lloyd") {
+  ch = numeric(length=kmax-1)
+  for (k in 2:kmax) {
+    km <- kmeans(x,centers=k,iter.max,nstart,algorithm)
+    ch[k-1] <- (km$betweenss/(k-1))/(km$tot.withinss/(nrow(x)-k))
+  }
+  return(list(k=2:kmax, ch=ch))
+}
+
+# get indexes for varied k
+index<-ch.index(X,10)
+
+# plot the index for k from 2 to 10
+plot(index$k,index$ch,
+     xlab="Number of Clusters",ylab="CH Index",
+     main = "Plot of CH Index for different numbers of clusters",pch=16)
+```
+
+This confirms our choice of $k = 2$. It seems reasonable to assume that these two clusters represent ads and non ads, as opposed to two other random factors. 
+
+\subsection{k-means}
+
+Now that we have a set number of groups to divide our data, we can try splitting it into these groups.
+
+Using the k-means clustering algorithm, we can divide the training data into two clusters. 
+
+```{r k-means,echo=TRUE,cache=TRUE}
+km<-kmeans(x = X,centers = 2,iter.max = 20,nstart = 2,algorithm = "Lloyd")
+```
+
+```{r kmeans util,cache=TRUE,echo=FALSE}
+# calculates misclassification rate
+misclassification.rate<-function(classification,actual){
+  matrix<-table(actual,classification,dnn=c("reality","prediction"))
+  percent<-100*signif(sum(diag(matrix))/sum(matrix),3)
+  return(100 - percent)
+}
+
+# returns the clustering with the lower misclassification rate
+findBestCluster<-function(cluster){
+  c1<-rep(NA,length(cluster))
+  c2<-rep(NA,length(cluster))
+  c1[which(cluster == 2)]<-1
+  c1[which(cluster == 1)]<-0
+  c2[which(cluster == 1)]<-1
+  c2[which(cluster == 2)]<-0
+  mis.rate.1<-misclassification.rate(c1,images.train$ad)
+  mis.rate.2<-misclassification.rate(c2,images.train$ad)
+  if (mis.rate.1 < mis.rate.2){
+    return(list(cluster = c1,rate=mis.rate.1))
+  }
+  else{
+    return(list(cluster = c2, rate = mis.rate.2))
+  }
+}
+# store the centers
+km.centers<-km$centers
+# store the best cluster
+km.cluster<-findBestCluster(km$cluster)$cluster
+```
+
+After running k-means and separating the data into two clusters, we are left with a classification rate (on the test data) of `r findBestCluster(km$cluster)$rate`%. In this clustering, 1195 data points were labeled as non ads an 164 data points were labeled as ads.
+
+We can use the centers of these two clusters to classify future data.
+
+\subsection{Hierarchical Agglomerative Clustering}
+
+In addition to running the k-means algorithm, we can also perform hierarchical agglomerative clustering on the data set. 
+
+```{r HAC1,cache=TRUE,warning=FALSE}
+d = dist(X)
+tree.s<-hclust(d,method="single")
+tree.c<-hclust(d,method="complete")
+tree.avg<-hclust(d,method="average")
+```
+
+```{r H A C,echo=FALSE,cache=TRUE,warning=FALSE}
+tree.s.miss<-rep(NA,10)
+tree.c.miss<-rep(NA,10)
+tree.avg.miss<-rep(NA,10)
+
+assignBestCluster<-function(cluster,k){
+  x<-1:k
+  # for size of group 1
+  best.cluster<-NULL
+  best.rate<-100
+  for (i in 1:round(k/2)){
+    # get all combinations of groups
+    combos<-combn(x,i)
+    # for each possible 2-clustering
+    for (col in 1:ncol(combos)){
+      # create two clusters
+      group1<-combos[col]
+      group2<-setdiff(group1,x)
+      new.cluster<-rep(NA,length(cluster))
+      
+      # relabel the clusters
+      for (point in 1:length(cluster)){
+        if (cluster[point] %in% group1){
+          new.cluster[point] = 1
+        }
+        else{
+          new.cluster[point] = 2
+        }
+      }
+      # get best cluster
+      best<-findBestCluster(new.cluster)
+      
+      if (best$rate < best.rate){
+        best.rate = best$rate
+        best.cluster = new.cluster
+      }
+    }
+    
+  }
+  return(list(cluster = best.cluster,rate=best.rate))
+}
+
+
+k.means<-rep(NA,10)
+for (k in 2:11){
+  k.means[k-1]<-assignBestCluster(kmeans(x = X,centers = k,iter.max = 20,nstart = 2,algorithm = "Lloyd")$cluster,k)$rate
+  tree.s.miss[k-1]<-assignBestCluster(cutree(tree.s,k=k),k)$rate
+  tree.c.miss[k-1]<-assignBestCluster(cutree(tree.c,k=k),k)$rate
+  tree.avg.miss[k-1]<-assignBestCluster(cutree(tree.avg,k=k),k)$rate
+}
+
+perc.error.matrix<-rbind(k.means,tree.s.miss,tree.c.miss,tree.avg.miss)
+colnames(perc.error.matrix) = paste(2:11)
+rownames(perc.error.matrix) = c("k-means","single linkage","complete linkage","average linkage")
+```
+
+Printed below are the classification rates for $k$-means and then hierarchical clusters using single, complete and average linkage respectively, for $k$ in the range 2 to 11. For $k \neq 2$, every single combination of clustering the $k$ clusters into 2 clusters was considered, and the best classification error (and cluster) was used.
+
+```{r H A C print,echo=FALSE}
+kable(perc.error.matrix,digits = 3,caption = "Misclassification Rates for Unsupervised Methods")
+```
+
+Notice that we get the best rate (even better than k-means clustering) for hierarchical clustering with average linkage and $k$ = 8 or 9 or 10.
+
+It is possible that within the two groups (ad and non-ad), there are 8 (or 9 or 10) subgroups that can be used to even better identify which images are ads. Because we do not have any more information about ads (like whether there are 4 different types of ads and 4 different types of regular images), it seems unwise to try to incorporate this finding into our model. It is possible this is a structure that exists in our training set but not in the set of all images.
+
+\subsection{Summary}
+
+Ultimately, the most important takeaway from our unsupervised analysis is that there are 2 main subgroups of our training data (hopefully, these groups are ads and non ads.) While we may later try to use some of the clustering from this analysis, it is more likely that supervised analysis will be much better at predicting whether an image is an ad.
+
+\section{Supervised Analysis}
+
+Supervised analysis allows us to incorporate the labels (ad and non ad) from our training set and build models that can predict whether or not an image is an ad. We will use cross validation for all of our models to get the 
+
+\subsection{Variable Importance}
+
+We start our supervised analysis by determining which predictor variables are the most important in predicting whether an image is an ad.
+
+To find these predictor variables, we create a random forest using the training data
+```{r Random Forest,cache=TRUE,echo=TRUE,warning=FALSE,fig.height=3}
+forest<-randomForest(ad~.,data=images.train)
+varImpPlot(forest,n.var=10)
+```
+
+We can see the 10 most important variables in this plot. The names of these variables are listed below in order of importance. Based on the variable importance as given by the random forest the variables
+
+\begin{verbatim}
+width, ancurl_com, url_ads, ancurl_click, height, ancurl_http_www, url_ad, alt_click, 
+url_images_home, origurl_jun
+\end{verbatim}
+
+are the most important. We can use these variables to build models that do not depend on all of the variables. This could help us prevent over-fitting.
+
+
+```{r Important Vars,echo=FALSE}
+X.limited<-cbind(images.train$width,images.train$ancurl_com,images.train$ancurl_click,images.train$url_ads,images.train$ancurl_http_www,images.train$height,images.train$url_ad,images.train$alt_click,images.train$ancurl_redirect,images.train$origurl_jun)
+formula="ad~width+ancurl_com+ancurl_click+url_ads+ancurl_http_www+height+url_ad+ alt_click+ancurl_redirect+origurl_jun"
+y.limited<-cbind(images.test$width,images.test$ancurl_com,images.test$ancurl_click,images.test$url_ads,images.test$ancurl_http_www,images.test$height,images.test$url_ad,images.test$alt_click,images.test$ancurl_redirect,images.test$origurl_jun)
+```
+
+From now on, we can refer to models built only on these predictor variables as the limited model, and models built on all of the predictor variables as the full model.
+
+\subsection{$k$-nearest neighbors}
+
+Our first predictive model will use the $k$-nearest neighbors algorithm.
+
+We can run this algorithm on our two different models and classify observations by the 
+```{r KNN,cache=TRUE,echo=FALSE}
+cv.knn<-function(X,response,k,nfolds=5){
+  fold.labels <- sample(rep(1:nfolds, length.out = nrow(X)))
+  misclass <- rep(NA, length = nfolds)
+  for (fold in 1:nfolds){
+    test.rows<-which(fold.labels == fold)
+    train<-X[-test.rows,]
+    test<-X[test.rows,]
+    current.model<-knn(train = train,test = test,k = k,cl = response[-test.rows])
+    bin<-rep(NA,nrow(test))
+    bin[which(current.model == "0")]<-0
+    bin[which(current.model == "1")]<-1  
+    misclass[fold] = sum(ifelse(bin == response[test.rows],0,1))/length(response[test.rows])
+  }
+  return(mean(misclass))
+}
+
+knn.error<-rep(NA,10)
+knn.error.full<-rep(NA,10)
+for (k in 1:10){
+  knn.error.full[k]<-cv.knn(X,images.train$ad,k)
+  knn.error[k]<-cv.knn(X.limited,images.train$ad,k)
+}
+
+knn.table<-rbind(knn.error,knn.error.full)
+rownames(knn.table)<-c("Limited model","Full model")
+colnames(knn.table)<-c("k = 1","k = 2","k = 3","k = 4","k = 5","k = 6","k = 7","k = 8","k = 9","k = 10")
+kable(knn.table,digits = 3,caption="Misclassification Errors for varied k (KNN)")
+```
+
+Since 1-nearest neighbors has the best cross validated error (`r knn.error[1]`\% for the limited model and `r knn.error.full[1]`\% for the full model), we will use this in our final prediction.
+
+\subsection{Logistic Regression}
+
+Using logistic regression, we can predict probabilities for images to be ads. We can then classify observations as ads or not based on how large these predicted probabilities are. We build Below is a table of the misclassification rates a logistic model over varied classification boundaries.
+
+```{r Logistic Regression,cache=TRUE,warning=FALSE,echo=FALSE}
+
+cv.logr<-function(data,class=.5,nfolds=5){
+  fold.labels <- sample(rep(1:nfolds, length.out = nrow(data)))
+  misclass <- rep(NA, length = nfolds)
+  for (fold in 1:nfolds){
+    test.rows<-which(fold.labels == fold)
+    train<-data[-test.rows,]
+    test<-data[test.rows,]
+    current.model<-glm(as.formula(formula),data=train,family="binomial")
+    predictions<-predict.glm(current.model,newdata=test,type="response")
+    classifications<-ifelse(predictions > class,1,0)
+    misclass[fold] = sum(ifelse(classifications == test$ad,0,1))/length(test$ad)
+  }
+  return(mean(misclass))
+}
+
+logr.error<-rep(NA,5)
+for (class in 5:9){
+  logr.error[class-4]<-cv.logr(images.train,class=class/10)
+}
+
+logr.table<-rbind(logr.error)
+rownames(logr.table)<-"misclassification error"
+colnames(logr.table)<-c("p > .5","p > .6","p > .7","p > .8","p > .9")
+kable(logr.table,digits = 3,caption="Misclassification Errors for varied classification boundary (logistic regression)")
+```
+
+From the table, we see that using a probability boundary of .8, we get the best misclassification error (`r logr.error[4]`\%). While this implies that we should classify something as ad if we are at least 80\% sure that it is an ad, we must be careful of over-fitting. It is possible that having to be 80\% sure (instead of 50\%) works on the training data because most of the observations in the training data are not ads.
+
+We also can try building different models using the limited and full data and allowing the predict function to classify each observation. In these models, we can use the value of $\lambda$ one standard deviation over from the cross validated $\lambda$.  
+
+```{r logr 2,cache=TRUE,echo=FALSE,warning=FALSE}
+# logistic
+logr2<-glmnet(X,images.train$ad,family="binomial")
+logr3<-glmnet(X.limited,images.train$ad,family="binomial")
+cv.full<-cv.glmnet(X,images.train$ad,type.measure = "class")
+cv.lim<-cv.glmnet(X.limited,images.train$ad,type.measure = "class")
+
+cluster.glmnet.full<-predict(logr2,newx=as.matrix(images.train[,-1]),type="class",s=cv.full$lambda.1se)
+cluster.glmnet.lim<-predict(logr3,newx=X.limited,type="class",s=cv.lim$lambda.1se)
+glm.full.miss<-sum(ifelse(cluster.glmnet.full == images.train$ad,0,1))/length(images.train$ad)
+glm.lim.miss<-sum(ifelse(cluster.glmnet.lim == images.train$ad,0,1))/length(images.train$ad)
+```
+
+The misclassification rate for the full model when we predict class instead of probabilities is `r glm.full.miss`\%.
+
+The misclassification rate for the limited model when we predict class instead of probabilities is `r glm.lim.miss`\%.
+
+\subsection{Boosting}
+
+Our final predictive models will be generated using boosting. We can create boosted models for the full and limited data set and then predict using each of them.   
+
+```{r Boosting,cache=TRUE,echo=FALSE}
+boost<-ada(as.formula(formula),data = images.train,loss = "exponential",type = "discrete",iter=100,rpart.control(maxdepth=2,cp=-1,minsplit=0,xval=0))
+boost.full<-ada(ad~.,data = images.train,loss = "exponential",type = "discrete",iter=100,rpart.control(maxdepth=2,cp=-1,minsplit=0,xval=0))
+boost.predict<-predict(boost,newdata=images.train[,2:ncol(images.train)],type="vector")
+boost.full.predict<-predict(boost.full,newdata=images.train[,2:ncol(images.train)],type="vector")
+```
+
+```{r Boost Print,echo=FALSE}
+boost.lim.miss<-mean(boost.predict != images.train$ad)
+boost.full.miss<-mean(boost.full.predict != images.train$ad)
+```
+
+The misclassification rate for the full model when we use boosting is `r boost.full.miss`\%.
+
+The misclassification rate for the limited model when we use boosting is `r boost.lim.miss`\%.
+
+\section{Predictions}
+
+Now that we have finished building our models, it is time to make predictions from them.
+
+Based on the cross validated misclassification rates, the best three models were the full boosting model, the limited boosting model and full logistic model from best to worst. Since these three models have much lower misclassification rates than most of the other models, will use these three models to make predictions for our test set.
+
+```{r Predictions,cache=TRUE,echo=FALSE}
+# full logistic model predictions
+cluster.glmnet.full<-predict(logr2,newx=as.matrix(images.test[,-1]),type="class",s=cv.full$lambda.1se)
+# limited boost model predictions
+cluster.boost<-predict(boost,newdata=images.test[,-1],type="vector")
+# full boost model predictions
+cluster.boost.full<-predict(boost.full,newdata=images.test[,-1],type="vector")
+```
+
+```{r,echo=FALSE,cache=TRUE}
+cluster.glmnet.full<-as.numeric(cluster.glmnet.full)
+cluster.boost<-as.numeric(as.numeric(cluster.boost) == 2)
+cluster.boost.full<-as.numeric(as.numeric(cluster.boost.full) == 2)
+```
+
+We can use these three sets of predictions to predict whether or not each observation is an ad or not. We will do this by comparing the predictions between the three models. The algorithm used is explained in the commented function below.
+
+```{r predict function}
+# ARGUMENTS: model1, model2, model3, The best model, second best model and third best model
+# RETURNS: a binary vector of predictions indicating which observations are ads
+predict.ad<-function(model1,model2,model3){
+  ad<-rep(NA,length(model1))
+  for (i in 1:length(model1)){
+    # all models agree
+    if (model1[i] == model2[i] & model2[i] == model3[i] ){
+      ad[i] = model1[i]
+    }
+    # model1 and model2 agree
+    else if (model1[i] == model2[i]){
+      ad[i] = model1[i]
+    }
+    # model1 and model3 agree
+    else if (model1[i] == model3[i]){
+      ad[i] = model1[i]
+    }
+    # model 2 and model 3 agree
+    else if (model2[i] == model3[i]){
+      ad[i] = model2[i]
+    }
+    # Default case: return best model prediction
+    else{
+      ad[i] = model1[i]
+    }
+  }
+  return(ad)
+}
+
+```
+
+Even though the limited boosting model had a better misclassification rate than the full logistic model, since the misclassification rates were close it seems like a good idea to use the logistic model as our second best model. This might help stabilize our predictions because it is possible there is an error in both boosting models. 
+
+The first 70 predictions of our final prediction for the 1000 images in the test set are printed below.
+```{r Make Predictions,echo=FALSE}
+ad<-predict.ad(cluster.boost.full,cluster.glmnet.full,cluster.boost)
+ad[1:70]
+#team.name="winston wolf"
+#save(list=c("ad","team.name"),file="stat462final.RData")
+load("~/Desktop/Data Mining/Final Project/images_answer.RData")
+```
+
+We can compare these predictions to the actual classification of each observation.
+
+```{r,cache=TRUE}
+# correctly predicted
+sum(ifelse(ad == test.ans,1,0))
+```
+
+We correctly predicted 974 of the 1000 images observed.
+
+The misclassification rate of our prediction rule is thus .026\%.
+
+```{r,cache=TRUE}
+# correctly predicted for limited boosting model
+sum(ifelse(cluster.boost == test.ans,1,0))
+# correctly predicted for full boosting model
+sum(ifelse(cluster.boost.full == test.ans,1,0))
+# correctly predicted for full logistic model
+sum(ifelse(cluster.glmnet.full == test.ans,1,0))
+```
+
+Looking at the number of images correctly predicted by the three models we used alone, notice that we did better than the logistic regression but not better than the full or limited boosting model, although it was very close. A .026\% misclassification rate demonstrates that our prediction rule was a success.

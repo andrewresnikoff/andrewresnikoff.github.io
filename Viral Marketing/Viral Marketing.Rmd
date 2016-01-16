@@ -1,0 +1,614 @@
+---
+title: 'The "Viral Marketing" Effect'
+author: "Andrew Resnikoff"
+output:
+  pdf_document: default
+---
+
+```{r Data and Libraries,echo=FALSE,message=FALSE}
+# import data
+nodes<-read.csv("~/Desktop/36402/Final Exam/ckm-nodes.csv")
+network<-read.table("~/Desktop/36402/Final Exam/ckm-net.dat")
+# import libaries
+library(np)
+options(np.messages=FALSE)
+```
+
+\section{Introduction}
+
+## Background
+\paragraph{}
+In the 1950's, the antibiotic tetracycline started being used by group of doctors in Illinois. Through this analysis, we will explore the "viral marketing" effect by examining how this antibiotic managed to spread among this group of doctors. In this investigation, we hope to show how exactly the drug spread and whether it was related to personal contact between these doctors. We hypothesize that the social network between doctors will have a positive affect on the rate at which tetracycline is adopted.
+
+## Data
+\paragraph{}
+We are given two data sets, the first being a data frame we will call "nodes" and the other being a matrix we will call "network." The nodes data frame initially contains 246 observations of the following variables: 
+```{r,echo=FALSE}
+names(nodes)
+```
+
+\paragraph{}
+The entries in the $246 \times 246$  binary matrix "network" represent whether doctor $i$ and $j$ know each other (where $i$ and $j$ are the row and column respectively.)
+
+\paragraph{}
+Since we can not analyze the viral marketing affect on doctors who we do not know when or if they began using it, we exclude these observations from both the "nodes" data frame and the "network" matrix. This leaves us with 125 usable observations.
+```{r Remove NA and Inf,echo=FALSE}
+# find all rows with no NA
+full.data<-which(!is.na(nodes$adoption_date))
+# remove na from nodes data
+nodes<-nodes[full.data,]
+# remove network rows/cols for rows with na in nodes data
+network<-network[full.data,full.data]
+```
+
+We can take a preliminary look at what the doctors network looks like in the figure below. We see that there are 4 separate networks and then a few unique nodes that don't belong to any networks. This graph tells us that most people are connected to a social network in some way, so we do expect to see the "viral marketing" effect for most of the observations.
+
+```{r network,echo=FALSE,fig.align='center'}
+library(igraph)
+g<-graph.adjacency(as.matrix(network),mode = "undirected")
+l <- layout.fruchterman.reingold(g,niter=500,area=vcount(g)^2.3,repulserad=vcount(g)^4.5)
+plot.igraph(g,edge.width=2,layout=l)
+```
+
+\section{Data Analysis}
+
+## Plot Tetracycline Adoption Over Time
+
+\paragraph{}
+We begin the analysis by looking at which months doctors began prescribing tetracycline and how many total doctors were prescribing tetracycline after each month.
+
+```{r Question 1 Figure 1,fig.height=4,echo=FALSE}
+# plot 
+plot(1:17,table(nodes$adoption_date)[1:17],pch=16,
+     xlab="Month",ylab="Number of Doctors Who Began Prescribing",
+     main="Number of Doctors Who Began Prescribing vs. Month Started")
+
+```
+
+\paragraph{}
+This first plot shows the number of doctors who began prescribing tetracycline in each month. Notice that in months 1 to 7 many more doctors (around 10) begin prescribing tetracycline than in the later months (around 3).  
+
+```{r Question 1 Figure 2,fig.height=4,echo=FALSE}
+# plot
+plot(1:17,cumsum(table(nodes$adoption_date)[1:17]),pch=16,
+     xlab="Month",ylab="Total Number of Doctors Prescribing",
+     main="Total Number of Doctors Prescribing vs. Month")
+```
+
+\paragraph{}
+This second plot, which shows the total number of doctors who were prescribing tetracycline by each month, confirms what we saw in the first graph. There is a steady increase in the total number of doctors prescribing tetracycline until about month 7. At this point, the total number of doctors prescribing tetracycline begins to level off and increases at a much lower rate.
+
+## Estimate Adoption Probabilities
+
+The next step in our analysis involves finding the estimated probabilities that a doctor who has not yet adopted the drug will begin to do so in the next month. We can estimate these probabilities in two different ways. The first way involves estimating based on the total number of people who have adopted tetracycline before this month. The second way involves estimating based on the number of contacts a doctor has who have already adopted the drug.
+
+\subsection{Method 1}
+
+\paragraph{}
+We begin the first method by looking at the number of people who adopted the drug in a given month, the total number of doctors who adopted the drug before that month and the total number of doctors. 
+
+```{r 2 df}
+# frequency table as vector shows how many doctors adopt each month
+this.month<-as.vector(table(nodes$adoption_date)[1:17])
+# cumsum ads frequency table to get total who adopted by each month (0 adopted before month 1)
+N_t<-c(0,cumsum(this.month))[1:17]
+```
+
+\paragraph{}
+Now we need to estimate the probability a doctor will adopt the drug this month, given the number of doctors who have already adopted the drug, $N_t$. For each $N_t$, we have the number of doctors who adopted tetracycline that month. Since we are given the total number of doctors, `r nrow(network)`, we can estimate the probability a doctor will adopt the drug this month as follows.
+
+$$Pr(\text{Doctor will adopt the drug } | N_t) = \frac{\text{The number of doctors who did adopt the drug } | N_t}{`r nrow(network)` - N_t}$$
+
+```{r 2 estimate prob}
+# calculate probabilities
+prob<-(this.month/(rep(125,17) - N_t))
+```
+
+\paragraph{}
+From this vector, we can estimate the probability density using a kernel regression. The figure below shows our estimated density function, along with the $95\%$ confidence bounds and the estimated probabilities the curve was evaluated from. This curve can be evaluated from `r min(N_t)` to `r max(N_t)`, because these are the minimum and maximum values of $N_t$ respectively. We cannot really know for sure what happens beyond these endpoints.
+
+```{r 2 plot,message=FALSE,cache=TRUE,echo=FALSE}
+
+## FUNCTIONS BORROWED FROM NOTES ON NON PARAMETRIC REGRESSION
+
+# rasample function used for bootstrapping
+resample <- function(x) {
+  sample(x,size=length(x),replace=TRUE)
+}
+
+# resamples rows of a data frame
+resample.rows<- function(data) {
+  sample.rows <- resample(1:nrow(data))
+  return(data[sample.rows,])
+}
+
+# returns a non parametric regression on the data
+npr<-function(data){
+  bw <- npregbw(prob~N_t, data=data, tol=1e-3, ftol=1e-4)
+  fit <- npreg(bw)
+  return(fit)
+}
+
+# create grid to evaluate kernel regression on
+evaluation.points <- seq(from=min(N_t),to=max(N_t),by=1)
+evaluation.points <- data.frame(N_t=evaluation.points)
+
+# evaluates kernel regression object over evaluation grid
+eval.npr <- function(npr) {
+  return(predict(npr,newdata=evaluation.points))
+}
+
+# perform kernel regression
+kreg<-npreg(npregbw(prob~N_t,tol=1e-3,ftol=1e-4))
+
+# main curve
+main.curve <- eval.npr(kreg)
+
+# calculates kernel regression confidence intervals
+npr.cis <- function(B,alpha,data) {
+  tboot <- replicate(B,eval.npr(npr(resample.rows(data))))
+  low.quantiles <- apply(tboot,1,quantile,probs=alpha/2)
+  high.quantiles <- apply(tboot,1,quantile,probs=1-alpha/2)
+  low.cis <- 2*main.curve - high.quantiles
+  high.cis <- 2*main.curve - low.quantiles
+  cis <- rbind(low.cis,high.cis)
+  return(list(cis=cis,tboot=t(tboot)))
+}
+
+# calculate intervals
+ci<-npr.cis(1000,.05,data.frame(prob,N_t))
+
+# plot main curve
+plot(evaluation.points$N_t,main.curve,ylim=range(ci$cis),type="l",xlab="N_t",ylab="Probability")
+# plot low cis
+lines(evaluation.points$N_t,ci$cis[1,],col="grey")
+# plot high cis
+lines(evaluation.points$N_t,ci$cis[2,],col="grey")
+# plot actual estimated probabilities
+points(N_t,prob,pch=16,col="red")
+# add legend
+legend("topright",legend=c("Main","CIs","Estimated Points"),
+       col=c("black","grey","red"),pch=c(NA,NA,16),lwd=2, cex=.75,lty=c(1,1,NA))
+
+kreg.mse<-signif(kreg$bws$fval,3)
+```
+
+\paragraph{}
+The cross-validated MSE of this kernel regression is `r kreg.mse`. This low MSE suggests we have a good fit for our data.
+
+\paragraph{}
+From this estimation, we can calculate the average change in probability as $N_t$ increases.
+
+```{r 2 change,echo=FALSE}
+oneunit.change<-function(fhat){
+  # calculate one unit change
+  N.change<-rep(NA,length(fhat)-1)
+  for (i in 2:length(fhat)){
+    N.change[i-1]<-fhat[i] - fhat[i-1]
+  }
+  # average over doctors
+  N.change<-N.change/(nrow(network))
+  # and months
+  N.change<-N.change/(17)
+  
+  # get average
+  avg<-sum(N.change)
+  
+  # get sd
+  se<-sd(N.change)
+  
+  return(list(average = avg, sd = se))
+}
+
+# calculate change
+change<-oneunit.change(eval.npr(kreg))
+change.avg<-signif(change$average,3)
+change.sd<-signif(change$sd,3)
+
+```
+
+\paragraph{}
+For a one-unit change in $N_t$, the average predicted change in probability per doctor per month is $`r change.avg`$. The standard error of this change is $`r change.sd`$.
+
+\subsection{Method 2}
+
+\paragraph{}
+In the second method, we estimate the probability a doctor will adopt the drug this month based on the number of contacts a doctor has who have already adopted the drug. To start, we must first create a data frame recording, for every combination
+of doctor and month, whether that doctor began prescribing tetracycline that month (`began`), whether that doctor has begun prescribing tetracycline earlier than that month (`before`), and the number of their contacts who began prescribing before that month (`contacts.before`).
+
+```{r 3 df,echo=FALSE,cache=TRUE}
+doctor<-rep(1:125,each = 17)
+month<-rep(1:17,125)
+contacts.before<-rep(0,125*17)
+
+adopted<-function(doctor,month){
+  if (is.finite(nodes$adoption_date[doctor]) & nodes$adoption_date[doctor] == month){
+    return(1)
+  }
+  else{
+    return(0)
+  }
+}
+began<-mapply(adopted,doctor,month)
+
+adopted.before<-function(doctor,month){
+  if (nodes$adoption_date[doctor] < 17 & nodes$adoption_date[doctor] < month){
+    return(1)
+  }
+  else{
+    return(0)
+  }
+}
+before<-mapply(adopted.before,doctor,month)
+
+contacts.adopted<-function(doctor,month){
+  contacts<-which(network[doctor,] == 1)
+  idx<-(17*(contacts-1))+month
+  total<-sum(before[idx])
+  if (is.na(total)){
+    return(0)
+  }
+  else{
+    return(total)
+  }
+}
+contacts.before<-mapply(contacts.adopted,doctor,month)
+
+contacts.frame<-data.frame(doctor,month,began,before,contacts.before)
+```
+
+\paragraph{}
+
+To estimate the probability, we need a relationship between the size of a network (of people who are connected to someone who has adopted tetracycline) each month and the number of people who adopted tetracycline each month. We can get the former from our data frame, by going through each doctor and finding the number of contacts they had who had adopted tetracycline before they did. Using this information, along with the adoption date for each doctor, we can create a matrix (with 17 rows and some amount of columns), where each row represents a month of adoption and each column represents the number of contacts a doctor had who was already prescribing tetracycline. We then add one to each entry $M_{i,j}$ for each doctor who began prescribing in month $i$ and had $j$ contacts who were already prescribing the drug. 
+
+
+
+```{r 3 prob,cache=TRUE,echo=FALSE}
+doctors.linked<-function(doctor,month){
+  # if this doctor adopted this month
+  if (nodes$adoption_date[doctor] == month){
+    # return the number of contacts who began prescribing before this month
+    return (contacts.frame$contacts.before[(17*(doctor-1))+month])
+  }
+  else{
+    # nothing to return
+    return(NA)
+  }
+}
+
+# apply doctors.linked over all combinations of doctors and months
+linked.docs<-na.omit(mapply(doctors.linked,contacts.frame$doctor,contacts.frame$month))
+
+# build matrix of that shows how many contacts doctors had when they
+# adopted for each month
+doctors.linked.each.month<-function(link){
+  # get the months of adoption
+  adoption.months<-nodes$adoption_date[which(is.finite(nodes$adoption_date))]
+  # get the number of contacts each doctor had when they adopted
+  contacts.before.adopting<-as.vector(link)
+  # build matrix for results 
+  m<-matrix(0,nrow=17,ncol=10)
+  # for each month
+  for (i in 1:length(adoption.months)){
+    #NOTE:  contacts before adopting is 0 indexed
+    # Add one to an entry i,j if a doctor adopted in month i and had j contacts
+    m[adoption.months[i],contacts.before.adopting[i]+1] =  m[adoption.months[i],contacts.before.adopting[i]+1] + 1
+  }
+  # and return
+  return(m)
+}
+
+# calculates the column means for entries that are non zero
+col.means<-function(matrix){
+  # result vec
+  means<-rep(NA,ncol(matrix))
+  # for each number of contacts
+  for (col in 1:ncol(matrix)){
+    # divisor is number of non zero entries (or 1 if there are none)
+    nonzero<-max(length(which(matrix[,col] != 0)),1)
+    # calculate average
+    means[col] = sum(matrix[,col])/nonzero
+  }
+  return(means)
+}
+
+# estimates probability
+est.prob<-function(matrix){
+  # total doctors available
+  total<-length(nodes$adoption_date)
+  # go through rows in matrix
+  for (row in 1:nrow(matrix)){
+    # get the number of doctors in the row
+    docs.in.row<-sum(matrix[row,])
+    # probability = frequency/total available
+    matrix[row,] = matrix[row,]/total
+    # update total
+    total<-total-docs.in.row
+  }
+  # return average
+  return(col.means(matrix))
+}
+
+prob<-est.prob(doctors.linked.each.month(linked.docs))[-8]
+network.size<-(0:9)[-8]
+
+# put results into a table
+prob.table<-cbind(network.size,prob)
+colnames(prob.table) = c("Contacts Already Prescribing","Estimated Probability")
+library(knitr)
+kable(prob.table,digits = 3)
+```
+
+\paragraph{}
+From these estimated probabilities, we can fit a kernel regression. The figure below shows our estimated density function, along with the $95\%$ confidence bounds and the estimated probabilities the curve was evaluated from. This curve can be evaluated from `r min(network.size)` to `r max(network.size)`, because these are the minimum and maximum observed values of the size of a doctor's network already prescribing respectively (when a doctor is not already prescribing). Thus, our data does not give us enough information to accurately predict what happens outside of those endpoints.
+
+
+```{r 3 kreg,cache=TRUE,echo=FALSE}
+# returns a non parametric regression on the data
+npr<-function(data){
+  bw <- npregbw(prob~network.size, data=data, tol=1e-3, ftol=1e-4)
+  fit <- npreg(bw)
+  return(fit)
+}
+
+
+# create grid to evaluate kernel regression on
+evaluation.points <- seq(from=min(network.size),to=max(network.size),by=1)
+evaluation.points <- data.frame(network.size=evaluation.points)
+
+# perform kernel regression
+bw<-npregbw(prob~network.size,tol=1e-3,ftol=1e-4)
+kreg<-npreg(bw)
+
+# main curve
+main.curve <- eval.npr(kreg)
+
+# calculate intervals
+ci<-npr.cis(100,.05,data.frame(prob,network.size))
+
+# plot main curve
+plot(evaluation.points$network.size,main.curve,ylim=range(ci$cis),type="l",xlab="network size",ylab="Probability",xlim=c(min(network.size),max(network.size)))
+# plot low cis
+lines(evaluation.points$network.size,ci$cis[1,],col="grey")
+# plot high cis
+lines(evaluation.points$network.size,ci$cis[2,],col="grey")
+# plot actual estimated probabilities
+points(network.size,prob,pch=16,col="red")
+# add legend
+legend("topright",legend=c("Main","CIs","Estimated Points"),
+       col=c("black","grey","red"),pch=c(NA,NA,16),lwd=2, cex=.75,lty=c(1,1,NA))
+
+
+kreg.mse<-signif(kreg$bws$fval,3)
+```
+
+\paragraph{}
+The cross-validated MSE of this kernel regression is $`r kreg.mse`$. This low MSE suggests we have a good fit for our data.
+
+\paragraph{}
+
+Looking at this plot, it may seem like the relationship between network size and probability is a negative one, contrary to what we would expect, but actually, this is not the case. First, it is important to note that mean and median number of contacts a person has are $`r mean(apply(network,1,sum))`$ and $`r  median(apply(network,1,sum))`$ respectively. These probabilities do not take into account how many contacts a person actually had in total in the estimation. Notice that the estimated probabilities for having 2 or 3 contacts already prescribing the drug are the two highest (other than for having 0, but for this networking effect to exist some people will have to initially try it without it being recommended to them by a doctor in their network.) This suggests that if most of the doctors in a doctors' network are using the drug, the doctor is more likely to start prescribing it as well. Also, the drop off in probability as the number of contacts using prescribing tetracycline also makes sense. If the first 2 or 3 doctors could not convince this doctor to start using tetracycline, this doctor may only start prescribing once almost everyone in their network is using it. And some will never start prescribing it at all, despite their contacts who have started prescribing it. 
+
+\paragraph{}
+Ultimately, this plot does show support the hypothesized network effect. A curve that does not support the network effect hypothesis might show a constant probability for all network sizes prescribing tetracycline. Since this plot shows that once 2 or 3 of a doctors' friends begin using tetracycline, the doctor becomes more likely to start using it, it seems that these other doctors do have an effect on that doctor.
+
+```{r 3 one unit change,echo=FALSE}
+# calculate one unit change
+change<-oneunit.change(eval.npr(kreg))
+change.avg<-signif(change$average,3)
+change.sd<-signif(change$sd,3)
+
+```
+
+\paragraph{}
+For a one-unit change in network size prescribing tetracycline, the average predicted change in probability per doctor per month is $`r change.avg`$. The standard error of this change is $`r change.sd`$.
+
+## Estimation Comparison
+\paragraph{}
+Looking at our two methods of probability estimation, there is a good amount of consistency between them. The first method shows that over time, there is a gradual buildup to the number of people who begin prescribing. At first, only a few people are willing to try the new drug. Eventually, word of this drug begins spreading through these social networks. Once there are is good portion of doctors using it (suggested to be around 40 in the first method plot), most doctors will have a few friends (between 2 and 4) in their network using it and thus there is a spike in the probability that a doctor will begin using tetracycline. After this spike has passed, most of the people left are doctors who will either never start prescribing tetracycline. There will still be a few doctors who will wait for even more of their friends to start using it, which explains why both plots show the probability decreases after the spike.
+
+\paragraph{}
+Since we see that these probability estimations seem to be deeply related, this implies that these estimation methods are confounding and that the average change we estimated for each method is not quite the causal effect on adoption. For the average change in adoption rate for a one unit change total number of doctors prescribing tetracycline (or the total number of contacts prescribing tetracycline) to be a fair estimate, it would be necessary that the number of contacts prescribing tetracycline be independent of the total number of doctors prescribing tetracycline. This is an unreasonable assumption.
+
+```{r,echo=FALSE,fig.align='center'}
+adj.matrix<-matrix(c(0,1,0,1,0,0,1,1,0),nrow=3)
+rownames(adj.matrix)<-c("Total Doctors","Contacts","Adopt")
+colnames(adj.matrix)<-c("Total Doctors","Contacts","Adopt")
+g<-graph.adjacency(adj.matrix,mode = "directed")
+plot(g)
+```
+
+\paragraph{}
+The graph above shows how the total number of doctors prescribing and the total number of contacts prescribing might affect the probability that a doctor might adopt tetracycline. Notice that for us to accurate measure the causal effect for either the total number of doctors prescribing tetracycline or the total number of contacts prescribing tetracycline, we would need these values to be independent of one another, which is most likely not the case. To get an accurate estimation for one of the methods, we would need to control for the other method.
+
+## Additional Analysis
+
+\paragraph{}
+We can also explore the effects of some other factors on the probability that a doctor will adopt tetracycline. We can estimate the probability a doctor will adopt tetracycline based on the number of contacts they have who have already begun prescribing the drug, when the doctor graduated medical school, whether the doctor attends medical-society meetings and how many medical journals they read.
+
+\paragraph{}
+We first must isolate the observations of interest. Since the median number of medical journals read is `r median(nodes$medical_journals)`, we will say a doctor reads the minimum number of journals if they read less than `r median(nodes$medical_journals)`. We can get the observations that read less than `r median(nodes$medical_journals)` medical journals and who don't attend medical-society meetings. From that group, when we can then split the data by the years the doctors graduated medical school.
+
+\paragraph{}
+We now have 3 frames of 4 observations, 2 observations and 2 observations for the graduation periods before 1919, the 1920's and after 1945 respectively. Using, method 2, we can create estimate the probabilities of a doctor adopting tetracycline for each of these frames.
+
+```{r,echo=FALSE}
+# get target observations
+bef.19<-which(nodes$medical_school == "1919-" & nodes$medical_journals < 5 & nodes$attend_meetings == "none")
+the.20s<-which(nodes$medical_school == "1920--1929" & nodes$medical_journals < 5 & nodes$attend_meetings == "none")
+after.45<-which(nodes$medical_school == "1945+" & nodes$medical_journals < 5 & nodes$attend_meetings == "none")
+
+# get frame of these observations
+new.frame<-function(frame,idx){
+  v<-c()
+  # for each observation
+  for (i in idx){
+    # start index
+    start<-17*(i-1)+1
+    # end index
+    end<-17*i
+    # get all indices
+    v<-c(v,start:end)
+  }
+  # return frame of indices
+  return(frame[v,])
+}
+
+# build new frames
+f19<-new.frame(contacts.frame,bef.19)
+f20<-new.frame(contacts.frame,the.20s)
+f45<-new.frame(contacts.frame,after.45)
+
+# estimate probability as before, now with total as input
+est.prob<-function(matrix,total){
+  for (row in 1:nrow(matrix)){
+    docs.in.row<-sum(matrix[row,])
+    if (total > 0){
+      matrix[row,] = matrix[row,]/total
+      total<-total-docs.in.row 
+    }
+  }
+  return(col.means(matrix))
+}
+
+# get link as before with new frames
+link19<-na.omit(mapply(doctors.linked,f19$doctor,f19$month))
+link20<-na.omit(mapply(doctors.linked,f20$doctor,f20$month))
+link45<-na.omit(mapply(doctors.linked,f45$doctor,f45$month))
+
+# estimate probabilites
+prob.19<-est.prob(doctors.linked.each.month(link19),length(bef.19))[c(2,5)]
+prob.20<-est.prob(doctors.linked.each.month(link20),length(the.20s))[c(1,2)]
+prob.45<-est.prob(doctors.linked.each.month(link45),length(after.45))[c(1,3)]
+
+# get network sizes for those probabilities which are non-zero
+network.size19<-c(1,4)
+network.size20<-c(0,1)
+network.size45<-c(0,2)
+```
+
+\paragraph{}
+Since we do not have as many observations, our estimated models will not be as complete as they were previously. In each case, we end up fitting a line on 2 points. These lines can be seen, along with 95\% confidence bands and the actual estimated probabilities, in the plot below.
+
+```{r,echo=FALSE,warning=FALSE,cache=TRUE}
+# create grid to evaluate kernel regression on
+evaluation.points19 <- network.size19
+evaluation.points19 <- data.frame(network.size19=evaluation.points19)
+evaluation.points20 <- network.size20
+evaluation.points20 <- data.frame(network.size20=evaluation.points20)
+evaluation.points45 <- network.size45
+evaluation.points45 <- data.frame(network.size45=evaluation.points45)
+
+# predicts kernel npr over points
+eval.npr<-function(npr,points) {
+  return(predict(npr,newdata=points))
+}
+
+# perform kernel regression
+kreg19<-npreg(prob.19~network.size19)
+kreg20<-npreg(prob.20~network.size20)
+kreg45<-npreg(prob.45~network.size45)
+
+# main curve
+main.curve19 <- eval.npr(kreg19,evaluation.points19)
+main.curve20 <- eval.npr(kreg20,evaluation.points20)
+main.curve45 <- eval.npr(kreg45,evaluation.points45)
+
+# calculates kernel regression confidence intervals
+npr.cis <- function(B,alpha,data,points) {
+  tboot <- replicate(B,eval.npr(npr(resample.rows(data)),points))
+  low.quantiles <- apply(tboot,1,quantile,probs=alpha/2)
+  high.quantiles <- apply(tboot,1,quantile,probs=1-alpha/2)
+  low.cis <- 2*main.curve - high.quantiles
+  high.cis <- 2*main.curve - low.quantiles
+  cis <- rbind(low.cis,high.cis)
+  return(list(cis=cis,tboot=t(tboot)))
+}
+
+# calculate intervals
+ci19<-npr.cis(1000,.05,data.frame(prob.19,network.size19),points=evaluation.points19)
+ci20<-npr.cis(1000,.05,data.frame(prob.20,network.size20),points=evaluation.points20)
+ci45<-npr.cis(1000,.05,data.frame(prob.45,network.size45),points=evaluation.points45)
+
+# plot main curve
+plot(evaluation.points19$network.size19,main.curve19,
+     ylim=c(0,1),type="l",xlab="network size",
+     ylab="Probability",xlim=c(0,5),col="yellow")
+lines(evaluation.points20$network.size20,main.curve20,col="red")
+lines(evaluation.points45$network.size45,main.curve45,col="blue")
+
+# plot points
+points(x = network.size19,y=prob.19,pch=16,col="yellow")
+points(x = network.size20,y=prob.20,pch=16,col="red")
+points(x = network.size45,y=prob.45,pch=16,col="blue")
+
+# plot low cis
+lines(evaluation.points19$network.size,ci19$cis[1,c(2,5)],col="grey")
+lines(evaluation.points20$network.size,ci19$cis[1,c(1,2)],col="pink")
+lines(evaluation.points45$network.size,ci19$cis[1,c(1,3)],col="light blue")
+# plot high cis
+lines(evaluation.points19$network.size,ci19$cis[2,c(2,5)],col="grey")
+lines(evaluation.points20$network.size,ci20$cis[2,c(1,2)],col="pink")
+lines(evaluation.points45$network.size,ci45$cis[2,c(1,3)],col="light blue")
+
+# add legend
+legend("topright",legend=c("Before 1919","Between 1920-1929","After 1945"),
+       col=c("yellow","red","blue"),pch=c(NA,NA,NA),lwd=2, cex=.75,lty=c(1,1,1))
+```
+
+\paragraph{}
+It seems inappropriate to try to build and analyze a legitimate predictive model off of so few data points. We can still try to calculate the average change in probability of adoption for a one unit change in the network size.
+
+```{r,echo=FALSE,warning=FALSE,cache=FALSE}
+# calculate average and sd for one unit change in contacts for before 1919
+change<-oneunit.change(eval.npr(kreg19,evaluation.points19))
+change.avg19<-signif(change$average,3)
+change.sd19<-signif(change$sd,3)
+
+# calculate average and sd for one unit change in contacts for between 1920-1929
+change<-oneunit.change(eval.npr(kreg20,evaluation.points20))
+change.avg20<-signif(change$average,3)
+change.sd20<-signif(change$sd,3)
+
+# calculate average and sd for one unit change in contacts for after 1945
+change<-oneunit.change(eval.npr(kreg45,evaluation.points45))
+change.avg45<-signif(change$average,3)
+change.sd45<-signif(change$sd,3)
+
+```
+
+\begin{description}
+\item[Before 1919]
+For a one-unit change in network size prescribing tetracycline, the average predicted change in probability per doctor per month is $`r change.avg19`$. The standard error of this change is $1.02 \times 10^{-6}$.
+\item[1920-1929]
+For a one-unit change in network size prescribing tetracycline, the average predicted change in probability per doctor per month is $`r change.avg20`$. The standard error of this change is $1.24 \times 10^{-7}$.
+\item[After 1945]
+For a one-unit change in network size prescribing tetracycline, the average predicted change in probability per doctor per month is $`r change.avg45`$. The standard error of this change is $1.24 \times 10^{-7}$.
+\end{description}
+
+\paragraph{}
+These changes are valid estimates assuming that there are no other confounding factors that would also influence the probability for adoption that are influenced by the same factors that influence how the number of contacts prescribing the drug a doctor has affects the probability of adoption. In other words, assuming that controlling for medical school graduation date, medical journals read and medical-society meeting attendance satisfied the back-door criterion, these would be valid estimates.
+
+\section{Conclusions}
+\paragraph{}
+Based on our probability estimations, we can see strong evidence for the idea that tetracycline spread through Illinois at least partially due to the social network that existed through doctors. Our first estimation of the probability that a doctor would adopt (based on the total number of doctors who have begun prescribing tetracycline) demonstrated that once about a third of the doctors began prescribing tetracycline, the probability that a doctor would begin prescribing tetracycline had a sharp increase. Then, the probability fell back to close to its initial levels. 
+
+\paragraph{}
+This pattern indicates that the spread of the drug influenced other doctors to begin prescribing it. After most the doctors who allowed themselves to be influenced by what the other doctors were doing had all begun prescribing tetracycline, the doctors who held out began adopting with the same probability as if they found it on their own (as in they didn't listen to other doctors and did their own research to conclude that they should begin using the drug) or as if so many other doctors were using it they realized that it was a good idea for them to use it as well. 
+
+\paragraph{}
+Moving on to our second estimation, we see similar results. Doctors begin prescribing tetracycline while having no doctors in their network prescribing it with relatively high probability. This makes sense as some people would need to begin the process of "viral marketing." We see that once 2 or 3 of the doctors in a doctor's network have begun prescribing tetracycline, the doctor becomes way more likely to use it. Since the mean and median number of doctors in another doctors network are both around 3, this means that once the doctors in another doctor's circle have adopted tetracycline, that doctor is with relatively high probably going to adopt it too. We also see that the probability decreases as the number of contacts goes up. Doctors who have enough contacts to be able to have more than 5 or 6 doctors in their network and did not begin using it after 2 or 3 of those doctors in their network had were not convinced by the first few doctors in their network to begin using tetracycline. These doctors are less likely to begin prescribing at all. If they do start prescribing, it is probably for a reason unrelated to the social network effect. Or, if basically everyone in their network was using it, perhaps it was more of a peer pressure type situation. Regardless, we see that for most doctors, the social network does play a significant role.
+
+\paragraph{}
+In calculating the estimated effect of a one unit increase in the total number of doctors prescribing tetracycline and the size of a doctor's network prescribing tetracycline, we obtained the following effects averaged over months and doctors.
+
+For a one-unit change in the total number of doctors prescribing tetracycline, the average predicted change in probability per doctor per month is $1.02 \times 10^{-5}$. The standard error of this change is $1.39 \times 10^{-6}$.
+
+For a one-unit change in network size prescribing tetracycline, the average predicted change in probability per doctor per month is $-1.07 \times 10^{-5}$. The standard error of this change is $8.65 \times 10^{-7}$.
+
+\paragraph{}
+It is interesting to note that these effects are basically of equal magnitude and opposite sign. Even though the negative sign from the effect of the second method may seem counter-intuitive, remember that the probability peaks quickly for small network sizes and then decreases quickly from there. While these estimated values may be confounded by other influential variables, they are the values that we have found in this analysis and can at least serve as a benchmark until the effects have been fully investigated.  
+
+
+\paragraph{}
+In a future analysis, we could potentially improve this investigation by exploring the 4 disjoint networks we saw in the graph of the networks. There is potentially a different effect for each of these networks. Additionally, with some more data, we could explore the effects of more of the predictor variables on the average change. 
