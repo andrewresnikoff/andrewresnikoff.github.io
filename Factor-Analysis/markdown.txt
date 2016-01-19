@@ -1,0 +1,373 @@
+---
+title: 'Predicting Movement from Nueron Spikes'
+author: "Andrew Resnikoff"
+output: pdf_document
+---
+
+```{r Data and Libraries,echo=FALSE,message=FALSE}
+neur<-read.csv("~/Desktop/36402/Exam 2/neur.csv")
+library(scatterplot3d)
+library(mixtools)
+```
+
+\section*{Introduction}
+
+Brains are composed of neurons, which send electrical signals to communicate with other cells and control how an organism behaves. These signals are called "spikes." 
+
+Through this investigation, we aim to better understand the relationship between the number of spikes that occur in a short time period, a specific action and the neurons associated with that action.
+
+\section*{Data}
+
+We are given a data set of 646 observations from an experiment. Each observation corresponds to a 100ms time period and is a row in the data set. Each row has 96 different entries, each corresponding to a neuron. Each entry is the number of spikes in that time period for that specific neuron.
+
+There are no missing entries in the data. The summary statistics for the data are printed below. 
+```{r summary statistic,echo=FALSE}
+summary(as.vector(data.matrix(neur)))
+```
+
+
+Histograms of the number of spikes is shown below.
+```{r EDA,cache=TRUE,echo=FALSE,fig.height=5,fig.width=5,fig.align='center'}
+
+hist(as.vector(data.matrix(neur)),col="green",breaks=20,xlab="Spikes",ylab="Frequency",main="")
+```
+
+The distribution of the number of spikes (in general) is skewed right with a center around 3. This distribution ranges from 0 to 20. 
+
+If we look at the distribution of the number of spikes for random neurons or random observations, we see that the spike distribution can vary. 
+
+```{r,echo=FALSE,results='hide',eval=FALSE,fig.align='center'}
+par(mfrow = c(3,3))
+eda.sample<-sample(1:ncol(neur),9)
+for (i in 1:9){
+  hist(neur[,eda.sample[i]],col="blue",
+  xlab="Spikes",ylab="Frequency",main="")
+}
+title(main="Histograms of spikes for random nuerons",outer=TRUE)
+
+eda.sample<-sample(1:nrow(neur),9)
+for (i in 1:9){
+  hist(data.matrix(neur[eda.sample[i],]),col="red",
+  xlab="Spikes",ylab="Frequency",main="")
+}
+title("Histograms of spikes for random observations",outer=TRUE)
+
+
+par(mfrow = c(1,1))
+```
+
+\section*{Data Analysis}
+
+```{r Util,echo=FALSE}
+
+n<-nrow(neur)
+p<-ncol(neur)
+```
+
+We are given that the average number of spikes over a short interval is given by
+$$\vec{b} \cdot \vec{v} + a + \text{noise}$$
+
+This model is related to a factor model with 2 factors, where each factor is one of the x and y component of hand movement velocity vector.
+
+$\vec{b}$ is the preferred direction vector of a specific neuron. We can place this vector for each neuron together in a matrix, called $B$. Since there are 2 possible directions of movement, the preferred direction vector should have 2 entries. Thus, this matrix would be either $2 \times 96$ or $96 \times 2$.
+
+$\vec{v}$ is the direction a monkey intends to move its hand. There are 2 components of the velocity and in each observation the monkey is moving its hand. If we put together a matrix $V$ of the monkey's hand movement vector for each 100ms observation, we would have either a $646 \times 2$ or $2 \times 646$ matrix.
+
+$a$ is a constant baseline number of spikes for each neuron. This number is added to $\vec{b} \cdot \vec{v}$, which would be the number of spikes generated from movement to get the total number of spikes in the 100ms time period. We can put the $a$ value in a length 96 vector representing the baseline for all of the neurons and then create a matrix where there is a row for each observation and each row is the vector of baseline values. Call this matrix $A$.
+
+Notice we can now put together a full model for our data. Let's call our response $X$ and our noise matrix $\epsilon$.
+
+$$X = VB + A + \epsilon$$
+
+We say this model is related to a factor model because of the $A$ matrix. Since this is just a constant matrix, we can subtract this from our response and fit a factor model to the result. Then, we can simply add the $A$ matrix back in. Letting $X' = X - A$, we have
+$$X' = VB + \epsilon$$
+
+$V$ is the matrix of factor scores, as the velocity the monkey moves its hands are a hidden random variable.
+
+$B$ is the matrix of factor loadings, as the preferred direction vector will determine how the velocity will affect each neuron. 
+
+Notice that the 2 factors are represented in the 2 columns of $B$ and in the 2 rows of $V$ as the direction in which the monkey's hand moves.
+
+\subsection*{2 Factor Model}
+
+We can fit a 2-factor model to the data as follows.
+
+```{r}
+fm<-factanal(x = neur,factors = 2,scores = "regression")
+```
+
+The plot below shows the preferred direction for each neuron, using the estimated factor loadings from the factor model.
+
+```{r Fit Factor Model,cache=TRUE,fig.height=5,fig.width=5,echo=FALSE}
+plot(fm$loadings,ylab="y component",
+     ,xlab="x component",pch = 16,main="Preferred direction of each nueron")
+```
+
+The factor scores from our factor model estimate the intended direction of motion
+
+```{r Show movement,cache=TRUE,fig.height=5,fig.width=5,echo=FALSE}
+plot(fm$scores,xlab="x component",ylab="y component",main="Direction Groups",pch=16)
+```
+
+```{r Show 8 different directions of movement,cache=FALSE,fig.height=5,fig.width=5,echo=FALSE}
+#for (i in 1:645){
+#  arrows(fm$scores[i,1],fm$scores[i,2],fm$scores[i+1,1],fm$scores[i+1,2])
+#}
+```
+
+Using the k-means clustering algorithm, we can actually generate a plot that color codes the probable directions that the monkey was moving in.
+
+```{r k means,cache=TRUE,fig.height=5,fig.width=5,echo=FALSE}
+km<-kmeans(fm$scores,centers = 8,iter.max = 50,algorithm="Lloyd",nstart = 10)
+colors<-c("#E69F00", "#009E73", "#0072B2", "#CC79A7","#00ffff","#9400d3","#00ff7f","#ab95db")
+plot(fm$scores[,1],fm$scores[,2],col=colors[km$cluster],pch=16)
+```
+
+
+Using 3d scatterplot above shows the x and y components over time. Smaller x components are highlighted in red where larger ones are highlighted in black. From this plot, it seems that the monkey changed direction about every 10 seconds (100 * 100ms). 
+
+
+```{r 3d plot over time,cache=TRUE,message=FALSE,echo=FALSE}
+scatterplot3d(1:646,fm$scores[,1],fm$scores[,2],xlab="Time (in 100ms)",ylab="x component",zlab="y component",main = "Scatterplot of x and y velocity components over time",highlight.3d=TRUE,
+  type="h")
+```
+
+A rotation matrix is an orthogonal matrix that rotates around a given angle $\alpha$. In the 2 dimensional space we are currently working with, a rotation matrix $r$ would be of the form
+$$r_\alpha = \begin{bmatrix}
+\cos{\alpha} & -\sin{\alpha}\\
+\sin{\alpha} & \cos{\alpha}\\
+\end{bmatrix}
+$$
+Since we wish to rotate 30 degrees, we first convert degrees to radians. 30 degrees is equal to $\frac{\pi}{6}$ radians.
+$$r_{\frac{\pi}{6}} = \begin{bmatrix}
+\cos{\frac{\pi}{6}} & -\sin{\frac{\pi}{6}}\\
+\sin{\frac{\pi}{6}} & \cos{\frac{\pi}{6}}\\
+\end{bmatrix} = \begin{bmatrix}
+\frac{\sqrt{3}}{2} & -\frac{1}{2}\\
+\frac{1}{2} & \frac{\sqrt{3}}{2}\\
+\end{bmatrix}
+$$
+
+This has the affect of rotating the $B$ matrix (containing the preferred direction vector of each neuron) 30 degrees as well. This difference in coordinate systems will have no other effects on the factor analysis. This is because when we change the coordinate system, we are only changing how the factor scores space relates to the factor loadings space.
+
+\subsection*{3 Factor Model}
+
+```{r 3 Cluster Mixture Model,cache=TRUE,message=FALSE}
+mix3<-npEM(as.matrix(neur),mu0=3,maxiter=100,eps=1e-4,verb=FALSE,)
+```
+
+A 3 cluster model is appropriate because we can write the model in terms of the sum of three different components. The first component is $VB$, the second is $A$ and the third is $\epsilon$. 
+
+The relative weights for the 3 components are
+```{r}
+signif(mix3$lambdahat,3)
+```
+
+
+\subsection*{8 Factor Mixture Model}
+
+```{r 8 Cluster Mixture Model,cache=TRUE}
+mix8<-npEM(as.matrix(neur),mu0=8,maxiter=100,eps=1e-4,verb=FALSE)
+```
+
+An 8 Cluster Mixture Model is appropriate because each of the 8 clusters will represent one of the 8 directions that the monkey is moving its hand.
+
+The relative weights for the 8 components are
+```{r}
+signif(mix8$lambdahat,3)
+```
+
+
+```{r cv log likelihood,echo=FALSE}
+
+###############################################################################
+# sum.small: Sum a vector of very small numbers
+# loglik.np: Log-likelihood of np mixture model on arbitrary data set
+###############################################################################
+
+# Sum a vector of very small numbers, using the fact that
+  # sum(x) = max(x) * sum(x/max(x))
+  # so
+  # log(sum(x)) = max(log(x)) + log(sum(exp(log(x) - max(log(x)))))
+  # This reduces numerical "underflow" issues when dealing with very small
+  # numbers
+    # See also "Laplace approximation" for exponential sums or integrals
+# Inputs: vector of numbers to sum, whether the numbers have already been
+  # logged, whether to deliver sum(x) or log(sum(x))
+# Output: either sum(x) or log(sum(x))
+sum.small <- function(x, initial.log=TRUE, return.log=TRUE) {
+    # If we're not given the logs of the numbers initially, discard any
+    # zeroes (since they don't contribute to the sum) and take the log
+    if (! initial.log) {
+        x <- x[x>0]
+        x <- log(x)
+    }
+    # What's the largest summand (after logging)?
+    largest <- max(x)
+    # Adjust all the summands down by this
+    x <- x-largest
+    # Add everything up in logs --- you can double check that this will be
+    # exactly sum(x) if all the arithmetic is done exactly
+    total <- largest + log(sum(exp(x)))
+    # If we're not returning the log sum, undo the log
+    if (! return.log) {
+        total <- exp(total)
+    }
+    # and return
+    return(total)
+}
+
+logmixlik.np <- function(npmix, data) {
+    stopifnot(require(mixtools))
+    stopifnot(require(plyr))
+    # lambdahat are the predicted mixing weights for the model. 
+    # There is one weight for each of the K components (different models) that 
+    # make up the mix model
+    n.clusters <- length(npmix$lambdahat)
+    # block id is the columns of the data frame we use to make the model
+    # each predictor variable is represented by a column
+    p <- length(npmix$blockid)
+    stopifnot(ncol(data)==p)
+    # create a 3d array. Entries correspond to a predictor variable,
+    # a component model and an observation from the data
+    loglik.3d.array <- array(NA, dim=c(p,n.clusters,nrow(data)))
+    # for each predictor variable
+    for (var in 1:p) {
+        # for each component model
+        for (cluster in 1:n.clusters) {
+            # set the 3 dim vector 
+            loglik.3d.array[var,cluster,] <-
+                # to the log of the estimated
+                # kernel density values 
+                # evaluated for each of the observations for the given model component
+                log(density.npEM(x=npmix, u=data[,var], component=cluster,
+                                 block=var)$y)
+        }
+    }
+    # create a two by two array where the rows
+    # represent the k component models and the columns represent 
+    # the rows of the data and the entries are the sums of the 
+    # estimated kernel densities over the predictor variables
+    loglik.2d.array <- apply(loglik.3d.array,MARGIN=c(2,3),sum)
+    # create a 2d array where the rows
+    # represent the k component models and the columns represent 
+    # the rows of the data and the entries are the log of 
+    # estimated mixing weights for each 
+    loglik.2d.weighted <- sweep(loglik.2d.array, MARGIN=1,
+                                STATS=log(npmix$lambdahat), FUN="+")
+    loglik.1d <- apply(loglik.2d.weighted,2,sum.small)
+    return(list(sum(loglik.1d),loglik.3d.array))
+}
+
+# Mystery function for HW 9, Advanced Data Analysis, spring 2015
+
+# fm: a factor model (factanal object)
+# x: data matrix
+charles <- function(fm, x) {
+    # center and scale the colums of x
+    # ENSURES for each random variable, the observed values have mean 0 and variance 1
+    x <- scale(x)
+
+    # gets the number of rows of w, the matrix of factor loadings
+    p <- nrow(fm$loadings)
+    # rows of w must be the same number of cols of x
+    # each row of w represents loading factors for a different random variable x_i
+    # ALSO the model X = Fw + e implies 
+    stopifnot(ncol(x) == p)
+
+    
+    # get covariance matrix for random variables
+    v <- fm$loadings %*% t(fm$loadings)
+    # set all diagonals to 1 since cov(x1,x1) = var(x1) = 1
+    # since the variables were all scaled
+    diag(v) <- 1
+    
+    # make sure we can use this library
+    stopifnot(require(mixtools))
+    
+    # return logarithm of densities of multivariate norm with mean x and sigma v
+    return(sum(logdmvnorm(x,sigma=v)))
+    
+    # returns the log likelihood
+}
+
+```
+
+
+```{r CV factor}
+cv.ll<-function(data,factors,nfolds=5){
+  n <- nrow(data)
+  fold.labels <- sample(rep(1:nfolds, length.out=n))
+  ll<-rep(NA,nfolds)
+  for (fold in 1:nfolds) {
+    test.rows <- which(fold.labels == fold)
+    train <- data[-test.rows,]
+    test <- data[test.rows,]
+    fm<-factanal(train,factors = factors,scores = "regression")
+    ll[fold]<-charles(fm,test)
+  }
+  return(mean(ll))
+}
+```
+
+
+```{r CV mixture,cache=TRUE,warning=FALSE}
+cv.mix<-function(data,nfolds=5,k){
+  n<-nrow(data)
+  fold.labels <- sample(rep(1:nfolds, length.out=n))
+  loglikes <- rep(NA,nfolds)
+  for (fold in 1:nfolds){
+    test.rows <- which(fold.labels == fold)
+    train <- data[-test.rows,]
+    test <- data[test.rows,]
+    mixture <- npEM(train,mu0 = k,maxiter = 400,eps=1e-2,verb=FALSE)
+    ll<-as.numeric(logmixlik.np(npmix = mixture,data = test)[1])
+    loglikes[fold] <- ll
+  }
+  return(mean(data.matrix(loglikes)))
+}
+```
+
+The cross validated log likelihood for a mixture model with 3 components is 
+```{r,cache=TRUE}
+cv.mix(data = neur,k=3)
+```
+
+The cross validated log likelihood for a mixture model with 3 components is 
+```{r,cache=TRUE}
+cv.mix(data = neur,k=8)
+```
+
+The cross validated log likelihood for a factor model with 2 factors is
+```{r,cache=TRUE}
+cv.ll(data = neur,factors = 2)
+```
+
+We can check the cross validated log likelihood for many different models.
+
+The cross validated log likelihood for variable mixture models are shown and plotted below.
+```{r,cache=TRUE}
+cv.mix.val<-sapply(1:10,cv.mix,data=neur,nfolds=5)
+
+plot(1:10, cv.mix.val,
+xlab="number of factors", type="b", ylab="CV loglikelihood (Mixture Models)")
+```
+
+The cross validated log likelihood for variable factor models are shown and plotted below.
+```{r,cache=TRUE}
+cv.ll.val<-sapply(1:10,cv.ll,data=neur,nfolds=5)
+
+plot(1:10, cv.ll.val,
+xlab="number of factors", type="b", ylab="CV loglikelihood (Factor Models)")
+```
+
+\section*{Conclusions}
+
+Between the mixture models, the plot and values show that the three component mixture model has the highest log likelihood and is therefore the best model.
+
+Between the factor models, the two factor model has the highest log likelihood and is therefore the best model.
+
+When we compare the two models, we see that the log likelihood is much greater for factor models, and the two factor model has the highest log likelihood of any other model. This implies that (of these models), the two factor model is the best overall.
+
+This is as expected, because (as explained in more depth in \textbf{Models} \textit{2 Factor Model}
+) this fits the model that states the expected number of spikes in a short time period is $a + \vec{b} \cdot \vec{v}$.
