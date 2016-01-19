@@ -1,9 +1,69 @@
 body {
 	font-family: 'Anonymous Pro';
-	background: #8725d3;
+	/*background: #8725d3;
 	background-image: url("/static/images/ZenBG-1.png"), url("/static/images/ZenBG-2.png");
-	background-repeat: repeat-x, repeat;
+	background-repeat: repeat-x, repeat;*/
 	height:100vh;
+}
+
+/* nav */
+.navbar{
+	background:white;
+	position:fixed;
+	top:0;
+	left:0;
+	width:100%;
+	height:auto;
+	z-index:100;
+	padding:5vh;
+}
+
+#nav-home{
+	float:left;
+	width:60%;
+}
+
+#name{
+	font-size: 1.5em;
+}
+
+#name b a{
+	text-decoration: none;
+	color:black;
+}
+
+#nav-links{
+	float:left;
+	width:40%;
+}
+
+.nav-link{
+	display: inline-block;
+	font-size: 1.5em;
+}
+
+.nav-link a{
+	border-radius: 8%;
+	color:white;
+	text-decoration: none;
+	padding:10px;
+}
+
+.nav-link{
+	padding:0 15px;
+}
+
+.main{
+	margin-top: 13.5vh;
+	height:100vh;
+	width:100%;
+	color:white;
+	/* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#1e5799+0,7db9e8+100&1+0,0.54+41,0.7+86,0+100 */
+background: -moz-linear-gradient(top,  rgba(30,87,153,1) 0%, rgba(69,127,185,0.54) 41%, rgba(112,171,221,0.7) 86%, rgba(125,185,232,0) 100%); /* FF3.6-15 */
+background: -webkit-linear-gradient(top,  rgba(30,87,153,1) 0%,rgba(69,127,185,0.54) 41%,rgba(112,171,221,0.7) 86%,rgba(125,185,232,0) 100%); /* Chrome10-25,Safari5.1-6 */
+background: linear-gradient(to bottom,  rgba(30,87,153,1) 0%,rgba(69,127,185,0.54) 41%,rgba(112,171,221,0.7) 86%,rgba(125,185,232,0) 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#1e5799', endColorstr='#007db9e8',GradientType=0 ); /* IE6-9 */
+
 }
 
 /*  Home Page */
@@ -84,110 +144,19 @@ body {
 
 /* fractal */
 body {
-  background:black;  
+  background:black;
   display:-webkit-box;
   -webkit-box-pack:center;
   -webkit-box-align:center;
-}
-
-.effect-wrapper {
-  position:relative;
-  width:40%;
-  height:15vh;
-  margin: 0 auto;
-  z-index: -1000;
-}
-
-.effect-wrapper .layer1,
-.effect-wrapper .layer2 {
-  position:absolute;
-  top:0px;
-  left:0px;
-  width:100%;
-  height:100%;
-  display:-webkit-box;
-  -webkit-box-pack:center;
-  -webkit-box-align:center;
-  z-index: -1000;
-  border-style: dashed;
-}
-    
-.effect-wrapper .layer1,
-.effect-wrapper .layer1 * {
-    background:rgba(0,0,255,.1);
-    /*border-radius:10px;*/
-} 
-
-.effect-wrapper .layer2,
-.effect-wrapper .layer2 * {
-    background:rgba(0,0,0,.1);
-    /*border-radius:10px;*/
-} 
-
-.effect-wrapper .layer1 *,
-.effect-wrapper .layer2 * {
-    display:-webkit-box;
-  -webkit-box-pack:center;
-  -webkit-box-align:center;
-    width:40%;
-    height:40%;
-} 
-
-
-
-
-/* --------- Animation --------- */
-.effect-wrapper .layer1,
-.effect-wrapper .layer1 * {
-    -webkit-animation-name: spin-clockwise;
-    -webkit-animation-duration: 50s;
-    -webkit-animation-iteration-count: infinite;
-    -webkit-animation-timing-function: cubic-bezier(0.82, 0.24, 0.25, 0.75);
-    -webkit-box-shadow:inset 0 0 10px rgba(255,255,255,0.3);
-}
-
-.effect-wrapper .layer2,
-.effect-wrapper .layer2 * {
-    -webkit-animation-name: spin-counter-clockwise, pulsate-red;
-    -webkit-animation-duration: 50s;
-    -webkit-animation-iteration-count: infinite;
-    -webkit-animation-timing-function: cubic-bezier(0.82, 0.24, 0.25, 0.75);
-    -webkit-box-shadow:inset 0 0 10px rgba(255,255,255,0.3);
-}
-
-
-
-
-/* Animation: Clockwise */
-@-webkit-keyframes spin-clockwise {
-    0%   { -webkit-transform: rotate(0deg);   }
-    100% { -webkit-transform: rotate(360deg); }
-}
-
-/* Animation: Counter counter clockwise */
-@-webkit-keyframes spin-counter-clockwise {
-    0%   { -webkit-transform: rotate(0deg);   } 
-    100% { -webkit-transform: rotate(-360deg); }
-}
-
-
-
-/* Animation: Counter counter clockwise */
-@-webkit-keyframes pulsate-blue {
-    0%   { background:rgba(0,255,0,.1);
-           -webkit-transform:/* Add Cool stuff here! */; 
-    } 
-    100% { background:rgba(255,0,0,.1);
-           -webkit-transform:/* Add Cool stuff here! */; 
-    }
 }
 
 /* Paper List */
 
 .wrapper{
-  margin: 0 auto;
+  margin: 0 50px;
   padding: 40px;
   max-width: 800px;
+  margin-top:100px;
 }
 
 .subsection{
@@ -274,33 +243,20 @@ body {
 /* scroller */
 .scroller{
 	position:fixed;
-	top:0;
-	left:0;
-	width:5%;
+	top:100px;
+	left:5px;
+	width:auto;
 	height:100%;
 	color:white;
+	font-size: large;
+	border-right: 2px solid;
 }
 
-/* navigation */
-.back{
-	text-align: center;
-	position:fixed;
-	top:25px;
-	left:25px;
-	height:10vh;
-	width:10vh;
-	color:white;
-	font-size: 4em;
-} 
+.scroller ul li{
+	padding: 10px 5px;
+}
 
-.back a{
+.scroller ul li a{
 	text-decoration: none;
 	color:white;
-	border:2px outset;
-	border-radius: 50%;
 }
-
-.back a:hover{
-	background:white;
-	color:black;
-}   
