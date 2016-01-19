@@ -225,6 +225,11 @@ body {
 	background: #2980b9;
 }
 
+.black{
+	background:black;
+	color:white;
+}
+
 .row{
   display: table-row;
   @media screen and (max-width: 580px);
