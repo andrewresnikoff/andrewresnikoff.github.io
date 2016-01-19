@@ -227,7 +227,7 @@ body {
 
 .black{
 	background:black;
-	color:white;
+	font-weight: bold;
 }
 
 .row{
