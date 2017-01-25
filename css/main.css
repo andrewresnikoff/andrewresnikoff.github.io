@@ -6,6 +6,7 @@
 body{
 	font-family: "Montserrat";
 	background:#CAB7A2;
+	background:#DDD1C3;
 }
 
 hr{
@@ -33,10 +34,16 @@ hr{
 	height:auto;
 }
 
-.section{
+
+section{
+
+	background-attachment: fixed;
+
+}
+
+.section-title{
 	font-size:2em;
-	text-align: center;
-	margin:90px 15% 0 15%;
+	text-align:center;
 }
 
 .card{
@@ -48,49 +55,45 @@ hr{
 	box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
   	transition: all 0.3s cubic-bezier(.25,.8,.25,1);
 }
-.card:hover {
-  box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
-  cursor: pointer;
+
+.card:hover{
+	cursor: pointer;
+ 	box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
 }
 
-
 .card-title{
-	background:red;
-	height:50px;
-	line-height: 50px;
-	padding-left:10px;
-	color:white;
+	height:60px;
 	border-radius: 2px 2px 0 0;
+	line-height: 60px;
+	font-size: 14px;
+	padding:5px 15px;
+	color:white;
+
 }
 
 .card-content{
-	padding:10px 15px;
-	font-size:12px;
-	min-height: 150px;
+	padding:5px 15px;
+	min-height: 250px;
+	font-size: 12px;
 }
 
 .card-actions{
 	height:40px;
-	width:100%;
-	position: relative;
-	bottom:0;
-	left:0;
 	border-radius: 0 0 2px 2px;
-	padding:5px 0px;
-	line-height: 40px;
-}
-
-.actions{
-	padding:0 15px;
-	height:100%;
 }
 
 .action{
 	color:blue;
-	font-size: 12px;
+	font-size: 10px;
 	border-radius: 2px;
 	text-decoration: none;
-	margin:0 0 0 10px;
+	margin:5px 0 0 15px;
+	text-overflow: hidden;
+	white-space: nowrap;
+	height:40px;
+	float: left;
+	line-height: 40px;
+	text-align:center;
 }
 
 .action:hover{
@@ -103,6 +106,10 @@ hr{
 
 .red{
 	background:#C45C5C;
+}
+
+.purple{
+	background:#948EC0;
 }
 
 .sidebar{
@@ -121,4 +128,11 @@ hr{
 .container-fluid{
 	background:red;
 	padding:0%;
+}
+
+@media only screen and (max-width: 768px) {
+    /* For mobile phones: */
+    [class*="col-"] {
+        width: 100%;
+    }
 }
