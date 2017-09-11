@@ -25,6 +25,7 @@ body {
 
 #name{
 	font-size: 1.5em;
+	background:red;
 }
 
 #name b a{
@@ -265,3 +266,4 @@ body {
 	text-decoration: none;
 	color:white;
 }
+

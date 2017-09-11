@@ -26,12 +26,84 @@ hr{
 #name{
 	color:white;
 	text-decoration: none;
+	text-align: center;
+}
+
+#resume{
+	color:white !important;
+	z-index: 99;
+	text-decoration: none;
+	display: block;
+	height:100%;
+	width:40%;
+	text-align:right;
+}
+
+.navs{
+
+	width:60%;
+	display: block;
+	float:right;
+}
+
+.about-me{
+
+	margin-top:75px;
+	width:100%;
+	height:auto;
+
 }
 
 .papers{
 	margin-top:75px;
 	width:100%;
 	height:auto;
+}
+
+#photo{
+
+	height:160px;
+	width:80px;
+	background:black;
+	margin-left: 20px;
+	height:80px;
+	padding:5px;
+	border-radius: 4px;
+}
+
+.circle{border-radius:1px !important; background:black;padding:2px;}
+.left{float:left!important}
+.container,.panel{padding:0.01em 16px}
+.container:before, .container:after{
+	content:"";
+	display:table;
+	clear:both;
+	margin-bottom: 10px;
+}
+
+.container p{
+	margin-left:150px;
+}
+
+#linkedin{
+
+	background:#948EC0;
+	border:none;
+	padding:10px 15px;
+	margin-top:20px;
+	margin-left:20px;
+	color:white;
+	text-decoration: none;
+}
+
+.w3-card-4,.w3-hover-shadow:hover{box-shadow:0 4px 10px 0 rgba(0,0,0,0.2),0 4px 20px 0 rgba(0,0,0,0.19)}
+
+img{
+	background:white;
+	height:20%;
+	width:auto;
+	margin-left:20px;
+	padding:10px;
 }
 
 
@@ -128,6 +200,15 @@ section{
 .container-fluid{
 	background:red;
 	padding:0%;
+}
+
+.pull-left{
+
+	width:40px;
+	height:40px;
+	background:red !important;
+	float:right;
+	margin-right:100px;
 }
 
 @media only screen and (max-width: 768px) {
