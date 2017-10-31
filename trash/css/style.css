@@ -1,0 +1,269 @@
+body {
+	font-family: 'Anonymous Pro';
+	/*background: #8725d3;
+	background-image: url("/static/images/ZenBG-1.png"), url("/static/images/ZenBG-2.png");
+	background-repeat: repeat-x, repeat;*/
+	height:100vh;
+}
+
+/* nav */
+.navbar{
+	background:white;
+	position:fixed;
+	top:0;
+	left:0;
+	width:100%;
+	height:auto;
+	z-index:100;
+	padding:5vh;
+}
+
+#nav-home{
+	float:left;
+	width:60%;
+}
+
+#name{
+	font-size: 1.5em;
+	background:red;
+}
+
+#name b a{
+	text-decoration: none;
+	color:black;
+}
+
+#nav-links{
+	float:left;
+	width:40%;
+}
+
+.nav-link{
+	display: inline-block;
+	font-size: 1.5em;
+}
+
+.nav-link a{
+	border-radius: 8%;
+	color:white;
+	text-decoration: none;
+	padding:10px;
+}
+
+.nav-link{
+	padding:0 15px;
+}
+
+.main{
+	margin-top: 13.5vh;
+	height:100vh;
+	width:100%;
+	color:white;
+	/* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#1e5799+0,7db9e8+100&1+0,0.54+41,0.7+86,0+100 */
+background: -moz-linear-gradient(top,  rgba(30,87,153,1) 0%, rgba(69,127,185,0.54) 41%, rgba(112,171,221,0.7) 86%, rgba(125,185,232,0) 100%); /* FF3.6-15 */
+background: -webkit-linear-gradient(top,  rgba(30,87,153,1) 0%,rgba(69,127,185,0.54) 41%,rgba(112,171,221,0.7) 86%,rgba(125,185,232,0) 100%); /* Chrome10-25,Safari5.1-6 */
+background: linear-gradient(to bottom,  rgba(30,87,153,1) 0%,rgba(69,127,185,0.54) 41%,rgba(112,171,221,0.7) 86%,rgba(125,185,232,0) 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#1e5799', endColorstr='#007db9e8',GradientType=0 ); /* IE6-9 */
+
+}
+
+/*  Home Page */
+.home{
+	height:80%;
+	display: block;
+	min-width: 400px;
+	width:auto;
+	margin-top:2%;
+}
+
+.home #name{
+	height:15%;
+	text-align: center;
+	font-size: 4em;
+	color:white;
+	width: 100%;
+}
+
+.home #info{
+	height:15%;
+	padding: 0px 20%;
+	color:white;
+}
+
+.home #links{
+	height:50%;
+	font-size: 3em;
+	text-align: center;
+}
+
+.home #links ul li{
+	color:white;
+	padding:25px 4%;
+}
+
+.home #links a{
+	color:white;
+	text-decoration: none;
+}
+
+/* Lets add an arrow after each link */
+.home #links a:hover:after {
+    position: absolute; /* Prevent underline of arrow */
+    padding-left:2px; /* Add a little space between text and arrow */
+    content: "\00bb"; /* Unicode hex for &raquo; */
+}
+
+.home #footer{
+	height:20%;
+}
+
+/* nav */
+.nav{
+	background:black;
+	opacity: 1;
+	z-index: 500;
+	width:100%;
+	position: absolute;
+	top:90vh;
+	left:0;
+	height:10vh;
+	color:white;
+}
+
+#resume{
+	float:left;
+	padding: 0px 4em;
+	color:white;
+	text-decoration: none;
+	font-size: 2em;
+}
+#copyright{
+	float:right;
+	padding: 0px 4em;
+	font-size:2em;
+}
+
+/* fractal */
+body {
+  background:black;
+  display:-webkit-box;
+  -webkit-box-pack:center;
+  -webkit-box-align:center;
+}
+
+/* Paper List */
+
+.wrapper{
+  margin: 0 50px;
+  padding: 40px;
+  max-width: 800px;
+  margin-top:100px;
+}
+
+.subsection{
+	font-size: 3em;
+	margin-bottom: 50px;
+	color:white;
+	font-weight: bold;
+}
+
+.table{
+  margin: 0 0 40px 0;
+  width: 100%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  display: table;
+  @media screen and (max-width: 580px);
+    display: block;
+}
+
+.papertitle{
+	font-size: 1.5em;
+	font-weight: bold;
+	color:white;
+}
+
+.abstract{
+	background:white !important;
+	color:black !important;
+}
+
+.buttons{
+	width:100%;
+}
+
+.btnList{
+	display: inline-block;
+	width:100%;
+}
+
+.btnList li{
+	display: inline-block;
+	float: right;
+	padding:10px 15px;
+
+}
+
+.viewBtn{
+	text-align: center;
+	display: inline-block;
+	background:grey;
+	height:100%;
+	width:100%;
+	padding:5px;
+	text-decoration: none;
+	color:white;
+}
+
+.green{
+	background: #27ae60;
+}
+
+.red{
+	background: #ea6153;
+}
+
+.blue{
+	background: #2980b9;
+}
+
+.black{
+	background:black;
+	font-weight: bold;
+}
+
+.row{
+  display: table-row;
+  @media screen and (max-width: 580px);
+    padding: 8px 0;
+    display: block;
+}
+
+.cell{
+  padding: 6px 12px;
+  display: table-cell;
+  @media screen and (max-width: 580px);
+    padding: 2px 12px;
+    display: block;
+}
+
+/* scroller */
+.scroller{
+	position:fixed;
+	top:100px;
+	left:5px;
+	width:auto;
+	height:100%;
+	color:white;
+	font-size: large;
+	border-right: 2px solid;
+}
+
+.scroller ul li{
+	padding: 10px 5px;
+}
+
+.scroller ul li a{
+	text-decoration: none;
+	color:white;
+}
+

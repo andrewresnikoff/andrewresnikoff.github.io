@@ -18,10 +18,6 @@
 
 #intro, #work, #team, #undergrad-work, #grad-work {padding-top: 4rem;}
 
-.btn{
-    background:var(--default-color) !important;
-    color:white !important;
-}
 
 #index-banner {
     min-height: 632px;
