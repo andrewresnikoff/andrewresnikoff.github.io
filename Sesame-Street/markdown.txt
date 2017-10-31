@@ -1,0 +1,941 @@
+---
+title: "Sesame Street Helps Disadvantaged Children Catch Up"
+author: ""
+date: ""
+geometry: "left=1.5cm,right=1.5cm,top=1.5cm,bottom=1.5cm"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=12, fig.height=5)
+if (!require(xtable)){
+  install.packages("xtable")
+  library("xtable")
+}
+```
+
+```{r import data, echo=FALSE}
+setwd("~/Desktop/36617/project1")
+data <- read.csv("sesame.txt")
+rows<-nrow(data)
+cols<-ncol(data)
+```
+
+```{r helper functions, echo = FALSE}
+
+get.colors <- function(n.colors){
+  colors <- c("#00A676", "#3691A7", "#882B3A", "#786F92", "#FCD0A1", "#40E3C7", "#E85858", "#1DB0C4")
+  return(colors[1:n.colors])
+}
+
+palette(get.colors(8))
+
+panel.cor <- function(x, y, digits=2, cex.cor)
+{
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  r <- cor(x, y)
+  txt <- format(c(r, 0.123456789), digits=digits)[1]
+  text(0.5, 0.5, paste("r = ",txt), cex=2)
+}
+
+```
+
+# Introduction
+
+### Background
+
+While in our society we value equality of opportunity, when children grow up less advantaged than others they don't have access to the same opportunities as some of their peers. These disadvantages can often affect the child's education and thus their entire life, especially when they don't get the help and reinforcement they need at an early age. Sesame Street, a popular children's tv show, designed its programming to teach kids between the ages of three and five different preschool related skills. This analysis will assess whether watching Sesame Street helped disadvantaged kids 'catch-up' with more advantaged ones, using certain cognitive skills of interest to compare what children learned between a pretest and posttest for varied frequencies of watching Sesame Street.
+
+# Methods
+
+### Exploratory Data Analysis
+
+
+The dataset being used throughout this investigation contains `r nrow(data)` observations of `r ncol(data)` variables from a sample of children from five different sites in the United States. The variables\footnote{A full list of each variable and its description is available in \textbf{Section 1} of the \textit{Appendix}} are: the subject identification number, the site the child was sampled from, the child's gender, how frequently the child watched Sesame Street, where the child watched Sesame Street, whether the child was encouraged to watch Sesame Street, the child's peabody score and test scores on the subjects of body parts, letters, forms, numbers, relational terms and classification skills before and after watching the series.
+
+We will create the following new variables of interest:
+
+\begin{description}
+
+\item[freq] = An indicator variable that is 1 if a child watches Sesame Street more than 3 times per week and 0 otherwise. 
+\item[pretest] The sum of all pretest scores for a given child
+\item[posttest] The sum of all posttest scores for a given child
+\item[change] The difference between \textit{posttest} and \textit{pretest}
+
+\end{description}
+
+```{r add test cols, echo=FALSE}
+# create freq, pretest, posttest and change vars
+data$freq <- as.numeric(data$viewcat >= 3) 
+data$pretest <- data$prenumb + data$prelet + 
+  data$preform + data$preclasf + data$prerelat + data$prebody
+data$posttest <- data$postnumb + data$postlet + 
+  data$postform + data$postclasf + data$postrelat + data$postbody
+data$change <- data$posttest - data$pretest
+```
+
+Notice that, despite the descriptions of the sites, the variations between each site do not seem to indicate that those who grew up in a disadvantaged area are not necessarily the 'disadvantaged' population of interest.
+
+```{r plot pretest, echo=FALSE}
+plot(x = 1:rows, y = data$pretest, 
+     xlab = "Subject ID", ylab = "Pretest Score (sum)",
+     main = "Pretest Scores by Site",
+     pch = 16, col = data$site)
+legend(x = 120, y = 200, 
+       legend = c("Disadvantaged Inner City", "Advantaged Suburban",
+                  "Advantaged Rural","Disadvantaged Rural", "Disadvantaged Spanish Speaking"), 
+       col = c(palette()[3],palette()[2], palette()[1], palette()[4], palette()[5]),
+       lty=1, cex=.8, lwd=3)
+```
+
+This implies that we will need to reconsider what it means for a child to be disadvantaged. One way to define disadvantaged is to look at children who are lagging behind in their given age group, since it seems fair to assume that older kids should perform better in general. We can check this using a pairs plot.
+
+```{r pairs age vs pretest, echo=FALSE}
+pairs(data[c("age", "pretest")],upper.panel=panel.smooth, lower.panel = panel.cor,main="Correlation between age and pretest")
+```
+
+A correlation of 0.44 implies that there is a moderate positive relationship between age and pretest scores. Looking at the smoothed line in the top right panel, we see that there appear to be two separate linear relationships based on how old the child is, which confirms our assumption. Since the median age is `r median(data$age)` months and that appears to be the age where the lines split, we will use the median age to separate the children.
+
+```{r adv calculations, echo = FALSE}
+
+data$agegroup = as.numeric(data$age > median(data$age))
+q1.older <- quantile(data$pretest[data$agegroup == 1])[2]
+q1.younger <- quantile(data$pretest[data$agegroup == 0])[2]
+data$adv[data$agegroup == 1] = as.numeric(data$pretest[data$agegroup == 1] > q1.older)
+data$adv[data$agegroup == 0] = as.numeric(data$pretest[data$agegroup == 0] > q1.younger)
+```
+
+We will assume that the bottom $25\%$ of pretest scores for each age group indicate that a child might be at some disadvantage. 
+
+```{r plot adv, echo = FALSE}
+plot(x = data$age, y = data$pretest, 
+     xlab = "Age", ylab = "Pretest Score (sum)",
+     main = "Pretest Scores by Age and Advantage",
+     pch = 17 - data$agegroup, col = data$adv + 2)
+legend(x = 34, y = 200, 
+       legend = c("Advantaged Older", "Advantaged Younger", "Disadvantaged Older", "Disadvantaged Younger"), 
+       col = c(palette()[3],palette()[3],palette()[2],palette()[2]),
+       lty=0, cex=1, lwd=3, pch = c(16, 17, 16, 17))
+```
+
+\textbf{Data Cleaning}
+
+```{r find bad data, echo=FALSE}
+
+find.bad.scores <- function(cols, max.points, data = data){
+  
+  result <- c()
+  
+  for (i in 1:length(cols)){
+  
+      precol <- paste("pre", cols[i],sep="")
+      postcol <- paste("post", cols[i],sep="")
+      bad.pts <- which(data[precol] > max.points[i] | data[postcol] > max.points[i])
+      if (length(bad.pts) > 0){
+        result <- append(result, bad.pts)
+      }
+  }
+  
+  return(result)
+}
+
+test.names <- c("body", "form", "let", "numb", "relat")
+max.pts <- c(32, 20, 58, 54, 17)
+bad.score.pts <- find.bad.scores(test.names, max.pts, data = data)
+more.bad.pts <- which(data$change < -35)
+to.remove <- append(bad.score.pts, more.bad.pts)
+```
+
+Notice that there are four cases (subject id's 5, 57, 163 and 213) where a given child has a score greater than the max score for a given test. These scores must have been recorded incorrectly. We will remove these bad data points from the investigation. 
+
+Furthermore, there are five children (subject id's 28, 40, 41, 51, 157) who experienced a large decrease from pretest to posttest scores. Since we have identified children as being advantaged if they scored in the top 75\% of their age group (which these children all did) as a way of identifying them as having established a reasonble baseline of knowledge, the fact that these children did so much more poorly on the post test indicates that these children most likely did not have the knowledge of this material in the first place. While there is no way to know why there was such a drastic decrease in scores, there is a possibility that these children should actually have been identified as disadvantaged in the first place. These observations are too suspicious to include them in the investigation, thus they will be removed as well.
+
+```{r remove bad data, echo = FALSE}
+old.data <- data
+data <- data[-to.remove, ]
+```
+
+After a basic initial cleaning of the data, we are left with `r nrow(data)` observations of `r ncol(data)` variables\footnote{Summary statistics for EDA can be found in \textbf{Section 2} of the \textit{Appendix}}.
+
+### Model
+
+To determine whether or not frequently watching Sesame Street helps disadvantaged children `catch-up' to advantaged children, we can compare the average change (\textit{postest - pretest}) in score among the four groups of interest: advantaged children who watched Sesame Street frequently, advantaged children who did not watch Sesame Street frequently, disadvatanged children who watched Sesame Street frequently and disadvantaged children who did not watch Sesame Street frequently. In our model, we use the age group of the child, the frequency of watching Sesame Street and whether or not the child is advantaged (explanatory variables) to predict the average change in test score (response). 
+
+In our initial data exploration, we found it fair to assume that younger children and older children will exhibit different baselines of knowledge when it comes to scores on the pretests and thus will experience knowledge growth at different rates. Therefore we will separate them when comparing means to ensure that the effects of one group do not overshadow the effect of the other. 
+
+We can employ a $t$-test to compare the mean difference across each group. A $t$-test with a $p$-value below the given alpha level ($\alpha = .05$) indicates that, assuming the difference between means of the two groups is 0, there is less than a $1 - \alpha$ $(95\%)$ chance of obtaining a sample like the one that was observed. This provides sufficient evidence to conclude that the means are actually not equal.
+
+### Assumptions
+
+In order to perform a $t$-test, we first must verify that our data is normally distributed. On inspecting each of the histograms, we see that the data either appear to be normally distributed, or the number of samples is enough that we can reasonably assume that the data is normal. Thus, we will carry on the analysis as though the assumptions are met. 
+
+
+```{r t means older vars, echo = FALSE}
+older.disadv.freq <- data$agegroup == 1 & data$adv == 0 & data$freq == 1
+older.disadv.nonfreq <- data$agegroup == 1 & data$adv == 0 & data$freq == 0
+older.adv.freq <- data$agegroup == 1 & data$adv == 1 & data$freq == 1
+older.adv.nonfreq <- data$agegroup == 1 & data$adv == 1 & data$freq == 0
+
+younger.disadv.freq <- data$agegroup == 0 & data$adv == 0 & data$freq == 1
+younger.disadv.nonfreq <- data$agegroup == 0 & data$adv == 0 & data$freq == 0
+younger.adv.freq <- data$agegroup == 0 & data$adv == 1 & data$freq == 1
+younger.adv.nonfreq <- data$agegroup == 0 & data$adv == 1 & data$freq == 0
+```
+
+
+```{r assumptions older, echo = FALSE}
+par(mfrow = c(2, 4))
+hist(data$change[older.disadv.freq], col = 1, main = "Change in Score (Older - DAdv - Freq)", xlab = "Change")
+hist(data$change[older.disadv.nonfreq], col = 2, main = "Change in Score (Older - DAdv - NFreq)", xlab = "Change")
+hist(data$change[older.adv.freq], col = 3, main = "Change in Score (Older - Adv - Freq)", xlab = "Change")
+hist(data$change[older.adv.nonfreq], col = 4, main = "Change in Score (Older - Adv - NFreq)", xlab = "Change")
+#nrow(data[older.adv.nonfreq,])
+#nrow(data[older.disadv.nonfreq,])
+#nrow(data[older.adv.freq,])
+#nrow(data[older.disadv.freq,])
+
+hist(data$change[younger.disadv.freq], col = 1, main = "Change in Score (Younger - DAdv - Freq)", xlab = "Change")
+hist(data$change[younger.disadv.nonfreq], col = 2, main = "Change in Score (Younger - DAdv - NFreq)", xlab = "Change")
+hist(data$change[younger.adv.freq], col = 3, main = "Change in Score (Younger - Adv - Freq)", xlab = "Change")
+hist(data$change[younger.adv.nonfreq], col = 4, main = "Change in Score (Younger - Adv - NFreq)", xlab = "Change")
+#nrow(data[younger.adv.nonfreq,])
+#nrow(data[younger.disadv.nonfreq,])
+#nrow(data[younger.adv.freq,])
+#nrow(data[younger.disadv.freq,])
+```
+
+```{r calculate means, echo = FALSE}
+older.mean.freq.dis <- round(mean(data$change[older.disadv.freq]), 2)
+older.mean.nonfreq.dis <- round(mean(data$change[older.disadv.nonfreq]), 2)
+older.mean.freq.adv <- round(mean(data$change[older.adv.freq]), 2)
+older.mean.nonfreq.adv <- round(mean(data$change[older.adv.nonfreq]), 2)
+
+older.mean.freq.dis.pre <- round(mean(data$pretest[older.disadv.freq]), 2)
+older.mean.nonfreq.dis.pre <- round(mean(data$pretest[older.disadv.nonfreq]), 2)
+older.mean.freq.adv.pre <- round(mean(data$pretest[older.adv.freq]), 2)
+older.mean.nonfreq.adv.pre <- round(mean(data$pretest[older.adv.nonfreq]), 2)
+
+older.mean.freq.dis.post <- round(mean(data$posttest[older.disadv.freq]), 2)
+older.mean.nonfreq.dis.post <- round(mean(data$posttest[older.disadv.nonfreq]), 2)
+older.mean.freq.adv.post <- round(mean(data$posttest[older.adv.freq]), 2)
+older.mean.nonfreq.adv.post <- round(mean(data$posttest[older.adv.nonfreq]), 2)
+```
+
+\textbf{Older Children}
+
+\begin{center}
+Table 1: Mean of Change in Test Scores for Older Children \\
+\medskip
+\begin{tabular}{| r | r | c | c | c |}
+\hline
+Group Number & Group Name & Mean \textit{change} & Mean \textit{pretest} & Mean \textit{posttest}\\
+\hline
+1 & Advantaged Frequent Watchers (Older) & `r older.mean.freq.adv` & `r older.mean.freq.adv.pre` & `r older.mean.freq.adv.post` \\
+\hline
+2 & Advantaged Nonfrequent Watchers (Older) & `r older.mean.nonfreq.adv` &`r older.mean.nonfreq.adv.pre` & `r older.mean.nonfreq.adv.post`\\
+\hline
+3 & Disadvantaged Frequent Watchers (Older) & `r older.mean.freq.dis` &  `r older.mean.freq.dis.pre` &  `r older.mean.freq.dis.post`\\
+\hline
+4 & Disadvantaged Nonfrequent Watchers (Older) & `r older.mean.nonfreq.dis` & `r older.mean.nonfreq.dis.pre` & `r older.mean.nonfreq.dis.post` \\
+\hline
+\end{tabular}
+\end{center}
+
+We test to see whether disadvantaged children who watch Sesame Street frequently see a change in scores significantly greater than any of the other three groups. Let $\mu_{d}^{(i,j)}$ represent the mean difference between children in categories $i$ and $j$. The three significance tests can be represented as follows: 
+
+$$H_{0}^{j}: \mu_{d}^{(3, j)} = 0$$
+$$H_{a}^{j}: \mu_{d}^{(3,j)} > 0$$
+$$j \in {1, 2, 4}$$
+
+```{r t means older test, echo = FALSE, eval = FALSE}
+# test disadv vs every other variable
+t.test(data$change[older.disadv.freq], data$change[older.adv.nonfreq], alternative = "greater")
+t.test(data$change[older.disadv.freq], data$change[older.adv.freq], alternative = "greater")
+t.test(data$change[older.disadv.freq], data$change[older.disadv.nonfreq], alternative = "greater")
+```
+
+\begin{center}
+Table 2: $t$-test Results for Older Children \\
+\begin{tabular}{| c | c | c | c |}
+\hline
+\bf Test $(i,j)$ & \bf $t$ & \bf $p$-value & \bf Significant? \\ 
+\hline
+$(3,1)$ & 0.53 & .30 & No\\
+\hline
+$(3,2)$ & -1.93 & .03 & Yes\\
+\hline
+$(3,4)$ & -1.90 & .04 & Yes\\
+\hline
+\end{tabular}
+\end{center}
+
+After carrying out these $t$-tests\footnote{Output for the $t$-tests can be found in \textbf{Section 3} of the \textit{Appendix}} using alpha level $\alpha = .05$, we find sufficient evidence to reject null hypotheses $H_{0}^{2}$ and $H_{0}^4$ - that older disadvantaged children who watch Sesame Street frequently demonstrate significantly greater improvement over older children who do not watch Sesame Street frequently regardless of whether or not they are advantaged. However, we fail to reject the null hypothesis $H_{0}^{1}$ and therefore we cannot conclude that older disadvantaged children who watch Sesame Street frequently demonstrate significantly greater improvement over older advantaged children who also watch Sesame Street frequently.
+
+```{r t means younger vars, echo = FALSE}
+
+younger.mean.freq.dis <- round(mean(data$change[younger.disadv.freq]), 2)
+younger.mean.nonfreq.dis <- round(mean(data$change[younger.disadv.nonfreq]), 2)
+younger.mean.freq.adv <- round(mean(data$change[younger.adv.freq]), 2)
+younger.mean.nonfreq.adv <- round(mean(data$change[younger.adv.nonfreq]), 2)
+
+younger.mean.freq.dis.pre <- round(mean(data$pretest[younger.disadv.freq]), 2)
+younger.mean.nonfreq.dis.pre <- round(mean(data$pretest[younger.disadv.nonfreq]), 2)
+younger.mean.freq.adv.pre <- round(mean(data$pretest[younger.adv.freq]), 2)
+younger.mean.nonfreq.adv.pre <- round(mean(data$pretest[younger.adv.nonfreq]), 2)
+
+younger.mean.freq.dis.post <- round(mean(data$posttest[younger.disadv.freq]), 2)
+younger.mean.nonfreq.dis.post <- round(mean(data$posttest[younger.disadv.nonfreq]), 2)
+younger.mean.freq.adv.post <- round(mean(data$posttest[younger.adv.freq]), 2)
+younger.mean.nonfreq.adv.post <- round(mean(data$posttest[younger.adv.nonfreq]), 2)
+
+```
+
+\textbf{Younger Children}
+
+\begin{center}
+Table 3: Mean of Change in Test Scores for Younger Children \\
+\medskip
+\begin{tabular}{| r | r | c | c | c |}
+\hline
+Group Number & Group Name & Mean \textit{change} & Mean \textit{pretest} & Mean \textit{posttest}\\
+\hline
+5 & Advantaged Frequent Watchers (Younger) & `r younger.mean.freq.adv` & `r younger.mean.freq.adv.pre` & `r younger.mean.freq.adv.post` \\
+\hline
+6 & Advantaged Nonfrequent Watchers (Younger) & `r younger.mean.nonfreq.adv` &`r younger.mean.nonfreq.adv.pre` & `r younger.mean.nonfreq.adv.post`\\
+\hline
+7 & Disadvantaged Frequent Watchers (Younger) & `r younger.mean.freq.dis` &  `r younger.mean.freq.dis.pre` &  `r younger.mean.freq.dis.post`\\
+\hline
+8 & Disadvantaged Nonfrequent Watchers (Younger) & `r younger.mean.nonfreq.dis` & `r younger.mean.nonfreq.dis.pre` & `r younger.mean.nonfreq.dis.post` \\
+\hline
+\end{tabular}
+\end{center}
+
+We perform the same $t$-tests as we did for the older children. The three significance tests can be represented as follows: 
+
+$$H_{0}^{j}: \mu_{d}^{(7, j)} = 0$$
+$$H_{a}^{j}: \mu_{d}^{(7,j)} > 0$$
+$$j \in {5, 6, 8}$$
+
+```{r t means younger test, echo = FALSE, eval = FALSE}
+# test disadv vs every other variable
+t.test(data$change[younger.disadv.freq], data$change[younger.adv.nonfreq], alternative = "greater")
+t.test(data$change[younger.disadv.freq], data$change[younger.adv.freq], alternative = "greater")
+t.test(data$change[younger.disadv.freq], data$change[younger.disadv.nonfreq], alternative = "greater")
+```
+
+\begin{center}
+Table 4: $t$-test Results for Younger Children \\
+\begin{tabular}{| c | c | c | c |}
+\hline
+\bf Test $(i,j)$ & \bf $t$ & \bf $p$-value & \bf Significant? \\ 
+\hline
+$(7,5)$ & -0.62 & .73 & No \\
+\hline
+$(7,6)$ & 2.86 & .00 & Yes \\
+\hline
+$(7,8)$ & 2.04 & .03 & Yes \\
+\hline
+\end{tabular}
+\end{center}
+
+
+After carrying out these $t$-tests\footnote{Output for the $t$-tests can be found in \textbf{Section 3} of the \textit{Appendix}} using alpha level $\alpha = .05$, we find sufficient evidence to reject null hypotheses $H_{0}^{6}$ and $H_{0}^{8}$ - that younger disadvantaged children who watch Sesame Street frequently demonstrate significantly greater improvement over younger children who do not watch Sesame Street frequently regardless of whether or not they are advantaged. However, we fail to reject the null hypothesis $H_{0}^{5}$ and therefore we cannot conclude that younger disadvantaged children who watch Sesame Street frequently demonstrate significantly greater improvement over younger advantaged children who also watch Sesame Street frequently.
+
+# Results
+
+The following plots demonstrate the differences in mean changes between each of the eight groups. 
+
+\textbf{Comparison of mean changes in score based on:
+\begin{itemize}
+\item The age group the child is in
+\item If the child watches Sesame Street frequently
+\item If the child was categorized as advantaged based on their pretest scores
+\end{itemize}
+}
+
+```{r plot, echo = FALSE}
+par(mfrow = c(1,2))
+comparison.matrix.older <-
+  t(matrix(c(older.mean.freq.dis,older.mean.freq.dis,older.mean.freq.dis,
+             older.mean.freq.adv, older.mean.nonfreq.adv, older.mean.nonfreq.dis),
+           ncol = 2))
+barplot(comparison.matrix.older, beside = TRUE, 
+        col = c(palette()[3], palette()[1], palette()[3], palette()[2],palette()[3], palette()[4]),
+        names.arg = c("3 vs 1", "3 vs 2", "3 vs 4"),
+        ylab = "Change in Scores (posttest - pretest)",
+        main = "Older Children")
+
+comparison.matrix.younger <-
+  t(matrix(c(younger.mean.freq.dis,younger.mean.freq.dis,younger.mean.freq.dis,
+             younger.mean.freq.adv, younger.mean.nonfreq.adv, younger.mean.nonfreq.dis),
+           ncol = 2))
+barplot(comparison.matrix.younger, beside = TRUE,
+        col = c(palette()[3], palette()[1], palette()[3], palette()[2],palette()[3], palette()[4]),
+        names.arg = c("7 vs 5", "7 vs 6", "7 vs 8"), 
+        ylab = "Change in Scores (posttest - pretest)",
+        main = "Younger Children")
+
+```
+
+```{r more plots, echo = FALSE}
+par(mfrow = c(1,2))
+data$group[older.adv.freq] = 1
+data$group[older.adv.nonfreq] = 2
+data$group[older.disadv.freq] = 3
+data$group[older.disadv.nonfreq] = 4
+data$group[younger.adv.freq] = 5
+data$group[younger.adv.nonfreq] = 6
+data$group[younger.disadv.freq] = 7
+data$group[younger.disadv.nonfreq] = 8
+older.group <- data[data$group <= 4,]
+younger.group <-data[data$group >= 5, ]
+plot(x = older.group$group,
+     y = older.group$change,
+     col = older.group$group, 
+     pch = 16,
+     main = "Change by Group Number (Older)",
+     xlab = "", ylab = "", axes = FALSE)
+axis(side=1, at=1:4, labels=c("1","2","3","4"))
+axis(side=2, at=seq(-60,90,5))
+older.mean.vec <- c(mean(older.group$change[older.group$group == 1]),
+                    mean(older.group$change[older.group$group == 2]),
+                    mean(older.group$change[older.group$group == 3]),
+                    mean(older.group$change[older.group$group == 4])
+              )
+older.sd.vec <- c(
+  sd(older.group$change[older.group$group == 1]) / 
+    sqrt(length(older.group$change[older.group$group == 1])),
+  sd(older.group$change[older.group$group == 2]) / 
+    sqrt(length(older.group$change[older.group$group == 2])),
+  sd(older.group$change[older.group$group == 3]) / 
+    sqrt(length(older.group$change[older.group$group == 3])),
+  sd(older.group$change[older.group$group == 4]) / 
+    sqrt(length(older.group$change[older.group$group == 4]))
+  )
+points(1:4, older.mean.vec, pch=15, col="#FFF519",cex = 1.5)
+arrows(x0=1:4, y0=older.mean.vec-older.sd.vec, y1=older.mean.vec+older.sd.vec, code=3, angle=90, length = 1)
+
+plot(x = younger.group$group,
+     y = younger.group$change,
+     col = younger.group$group - 4, 
+     pch = 16,
+     main = "Change by Group Number (Younger)",
+     xlab = "", ylab = "", axes = FALSE)
+axis(side=1, at=5:8, labels=c("5","6","7","8"))
+axis(side=2, at=seq(-70,110,5))
+younger.mean.vec <- c(mean(younger.group$change[younger.group$group == 5]),
+                    mean(younger.group$change[younger.group$group == 6]),
+                    mean(younger.group$change[younger.group$group == 7]),
+                    mean(younger.group$change[younger.group$group == 8])
+              )
+younger.sd.vec <- c(
+  sd(younger.group$change[younger.group$group == 5]) / 
+    sqrt(length(younger.group$change[younger.group$group == 5])),
+  sd(younger.group$change[younger.group$group == 6]) / 
+    sqrt(length(younger.group$change[younger.group$group == 6])),
+  sd(younger.group$change[younger.group$group == 7]) / 
+    sqrt(length(younger.group$change[younger.group$group == 7])),
+  sd(younger.group$change[younger.group$group == 8] / 
+    sqrt(length(younger.group$change[younger.group$group == 8])))
+              )
+points(5:8, younger.mean.vec, pch=15, col="#FFF519",cex = 1.5)
+arrows(x0=5:8, y0=younger.mean.vec-younger.sd.vec, y1=younger.mean.vec+younger.sd.vec, code=3, angle=90, length = 1)
+```
+
+
+The first set of plots show the mean change for disadvantaged children who frequently watch Sesame Street to each of the other groups, separated by age group. The second set of plots shows the mean change for each group along with error bars - these error bars identify the range where the mean might actually be. Notice how these error bars demonstrate the same result as our $t$-test. Disadvantaged children who watched Sesame Street frequently experienced a significantly greater increase in score compared to both advantaged and disadvantaged children who did not frequently watch Sesame Street. While those disadvantaged children do not experience a significantly different improvement in scores compared to advantaged children who also frequently watches Sesame Street, this is actually an important finding. 
+
+This implies that not only does Sesame Street help disadvantaged kids improve their scores significantly, but also Sesame Street continues to help those kids who are advantaged and don't need as much help to improve as well.
+
+# Summary
+
+Ultimately, we have found sufficient evidence to conclude that watching Sesame Street does help disadvantaged children catch up to their advantaged peers. We have shown this by performing six $t$-tests for the difference of means. We compared means from groups separated by age, frequency of watching Sesame Street and whether or not the child was considered advantaged or not.
+
+The $t$-tests provided justification for concluding that, in both the younger and older groups of children, there was a significantly greater increase in score among disadvantaged children who watched Sesame Street relative to children (both advantaged and disadvantaged) who did not watch Sesame Street frequently. While the evidence did not support that the disadvantaged Sesame Street watchers learned more than the advantaged ones, this fact only serves to highlight that Sesame Street can benefit children who have developed preschool skills just as much as it can benefit those who have not yet developed those skills.
+
+The iconic children's television show, Sesame Street, may have been popular with kids because it had catchy songs and characters that they liked. More importantly, it should have been popular with parents because of the significant learning that goes on while kids watch it. Children who watch Sesame Street frequently develop and improve their preschool level skills more than those who don't. This analysis found that watching Sesame Street often can help children who, for whatever reason, may have struggled with these skills enough to be considered `disadvantaged'. 
+
+\newpage
+
+# Appendix
+
+
+### Section 1: Variable Descriptions
+
+\begin{description}
+\item[id]
+subject identification number
+\item[site]
+Three to five year old disadvantaged children from inner city areas in various parts of the country.
+Four year old advantaged suburban children.
+Advantaged rural children.
+Disadvantaged rural children.
+Disadvantaged Spanish speaking children.
+\item[sex]
+gender of child   male=1, female=2
+\item[age]
+age in months
+\item[viewcat]
+frequency of viewing
+1=rarely watched the show
+2=once or  twice a week 
+3=three to five times a week
+4=watched the show on average of more than 5 times a week
+\item[setting]
+setting in which Sesame Street was viewed, 1=home 2=school
+\item[viewenc]
+treatment condition
+1=child encouraged to watch
+2=child not encouraged to watch
+\item[prebody]
+pretest on knowledge of body parts (0-32)
+\item[prelet]
+pretest on letters (0-58)
+\item[preform]
+pretest on forms (0-20)
+\item[prenumb]
+pretest on numbers (0-54)
+\item[prerelat]
+pretest on relational terms (0-17)
+\item[preclasf]
+pretest on classification skills
+\item[postbody]
+posttest on knowledge of body parts (0-32)
+\item[postlet]
+posttest on letters (0-58)
+\item[postform]
+posttest on forms (0-20)
+\item[postnumb]
+posttest on numbers (0-54)
+\item[postrelat]
+posttest on relational terms (0-17)
+\item[postclasf]
+posttest on classification skills
+\item[peabody]
+mental age score obtained from administration of the Peabody Picture Vocabulary test as a pretest measure of vocabulary maturity
+
+\end{description}
+
+### Section 2: Summary Statistics
+
+```{r summary statistics, echo=FALSE}
+
+# restore data
+clean.data <- data
+data <- old.data
+
+
+summary.stats <- function(data){
+  qs <- quantile(data)
+  return(rbind(
+    mean = round(mean(data), 2),
+    sd =  round(sd(data), 2),
+    min =  round(qs[1], 2),
+    q1 =  round(qs[2], 2),
+    median =  round(qs[3], 2),
+    q3 =  round(qs[4], 2),
+    max =  round(qs[5], 2)
+  ))
+}
+
+get.eda.cat<-function(vector,categories)
+{
+  index = 1
+  result<-c(0)
+  for (c in categories)
+  {
+    num<-length(which(vector==c))
+    n <- length(vector)
+    perc<-100*num/n
+    rounded <- round(perc, 2)
+    result[index]=rounded
+    index = index + 1
+  }
+  names(result) <- categories
+  return(result)
+}
+
+age.eda <- summary.stats(data$age)
+prenumb.eda <-summary.stats(data$prenumb)
+prelet.eda <- summary.stats(data$prelet)
+prebody.eda <- summary.stats(data$prebody)
+prerelat.eda <- summary.stats(data$prerelat)
+preclasf.eda <- summary.stats(data$preclasf)
+preform.eda <- summary.stats(data$preform)
+postnumb.eda <-summary.stats(data$postnumb)
+postlet.eda <- summary.stats(data$postlet)
+postbody.eda <- summary.stats(data$postbody)
+postrelat.eda <- summary.stats(data$postrelat)
+postclasf.eda <- summary.stats(data$postclasf)
+postform.eda <- summary.stats(data$postform)
+peabody.eda <- summary.stats(data$peabody)
+pretest.eda <- summary.stats(data$pretest)
+posttest.eda <- summary.stats(data$posttest)
+change.eda <- summary.stats(data$change)
+
+
+
+cont.eda <- cbind(age.eda,
+prenumb.eda, prelet.eda, prebody.eda, prerelat.eda, preclasf.eda, preform.eda, 
+postnumb.eda, postlet.eda, postbody.eda, postrelat.eda, postclasf.eda, postform.eda, 
+peabody.eda, pretest.eda, posttest.eda, change.eda
+)
+colnames(cont.eda) <- c("age", "prenumb", "prelet", "prebody","prerelat" ,"preclasf", "preform",
+                        "postnumb", "postlet", "postbody","postrelat" ,"postclasf", "postform", "peabody", "pretest", "posttest", "change")
+
+site.eda <- get.eda.cat(data$site, levels(data$site))
+sex.eda <- get.eda.cat(data$sex, levels(as.factor(data$sex)))
+names(sex.eda) <- c("Male", "Female")
+adv.eda <- get.eda.cat(as.factor(data$adv), levels(as.factor(data$adv)))
+names(adv.eda) <- c("Disadvantaged", "Advantaged")
+agegroup.eda <- get.eda.cat(as.factor(data$agegroup), levels(as.factor(data$agegroup)))
+names(agegroup.eda) <- c("Younger", "Older")
+viewenc.eda <- get.eda.cat(as.factor(data$viewenc), levels(as.factor(data$viewenc)))
+names(viewenc.eda) <- c("Encouraged", "Not Encouraged")
+freq.eda <- get.eda.cat(as.factor(data$freq), levels(as.factor(data$freq)))
+names(freq.eda) <- c("Not Frequent", "Frequent")
+cat.eda<-c(site.eda, sex.eda, adv.eda, agegroup.eda, viewenc.eda)
+for (i in 1: length(cat.eda)){
+  m <- as.matrix(cat.eda[i])
+ xtable(m) 
+}
+# restore data
+data <- clean.data
+```
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{rrrrrrrrrr}
+  \hline
+ & age & prenumb & prelet & prebody & prerelat & preclasf & preform & postnumb & postlet \\ 
+  \hline
+mean & 51.44 & 20.72 & 15.82 & 21.30 & 9.91 & 12.17 & 9.88 & 29.84 & 26.67 \\ 
+  sd & 6.22 & 10.59 & 8.36 & 6.39 & 3.07 & 4.62 & 3.74 & 12.81 & 13.26 \\ 
+  min & 34.00 & 1.00 & 1.00 & 6.00 & 2.00 & 0.00 & 2.00 & 0.00 & 0.00 \\ 
+  q1 & 48.00 & 13.00 & 11.75 & 16.75 & 8.00 & 9.00 & 7.75 & 19.00 & 15.00 \\ 
+  median & 52.00 & 18.50 & 14.00 & 21.00 & 10.00 & 12.00 & 10.00 & 29.00 & 23.00 \\ 
+  q3 & 56.00 & 27.00 & 17.00 & 26.00 & 12.00 & 15.00 & 12.00 & 41.25 & 39.25 \\ 
+  max & 69.00 & 52.00 & 55.00 & 32.00 & 16.00 & 24.00 & 19.00 & 54.00 & 54.00 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+\begin{table}
+\centering
+\begin{tabular}{rrrrrrrrr}
+  \hline
+ & postbody & postrelat & postclasf & postform & peabody & pretest & posttest & change \\ 
+  \hline
+mean & 25.15 & 11.58 & 15.72 & 13.72 & 46.50 & 89.80 & 122.69 & 32.89 \\ 
+  sd & 5.45 & 2.88 & 5.17 & 4.00 & 16.04 & 30.72 & 38.22 & 26.63 \\ 
+  min & 11.00 & 0.00 & 0.00 & 0.00 & 8.00 & 19.00 & 13.00 & -65.00 \\ 
+  q1 & 21.00 & 10.00 & 11.00 & 11.00 & 35.00 & 68.00 & 91.00 & 16.00 \\ 
+  median & 27.00 & 12.00 & 16.00 & 14.00 & 42.00 & 87.50 & 120.00 & 31.00 \\ 
+  q3 & 29.00 & 14.00 & 20.00 & 17.00 & 58.00 & 107.00 & 154.00 & 53.00 \\ 
+  max & 32.00 & 17.00 & 24.00 & 20.00 & 99.00 & 194.00 & 196.00 & 102.00 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+\begin{table}
+\centering
+\begin{tabular}{| lrr || lrr || lrr |}
+  \hline
+Age Group & Younger & Older & Advantaged? & Yes & No & Frequent Watcher? & Yes & No   \\ 
+  \hline
+ & 55.42\% & 44.58\% & & 74.17\% & 25.83\% & & 52.54\% & 47.46\%\\ 
+   \hline
+\end{tabular}
+\end{table}
+
+### Section 3: $t$-tests, p-values
+
+```{r t testing}
+# test disadv vs every other variable
+
+# testing 3 vs 1 (older-disadv-freq vs older-adv-freq)
+t.test(data$change[older.disadv.freq], data$change[older.adv.freq], alternative = "greater")
+# testing 3 vs 2 (older-disadv-freq vs older-adv-nonfreq)
+t.test(data$change[older.disadv.freq], data$change[older.adv.nonfreq], alternative = "greater")
+# testing 3 vs 4 (older-disadv-freq vs older-disadv-nonfreq)
+t.test(data$change[older.disadv.freq], data$change[older.disadv.nonfreq], alternative = "greater")
+
+# testing 7 vs 5 (younger-disadv-freq vs younger-adv-freq)
+t.test(data$change[younger.disadv.freq], data$change[younger.adv.freq], alternative = "greater")
+# testing 7 vs 6 (younger-disadv-freq vs younger-adv-nonfreq)
+t.test(data$change[younger.disadv.freq], data$change[younger.adv.nonfreq], alternative = "greater")
+# testing 7 vs 8 (younger-disadv-freq vs younger-disadv-nonfreq)
+t.test(data$change[younger.disadv.freq], data$change[younger.disadv.nonfreq], alternative = "greater")
+```
+
+\newpage
+### Section 4: Code
+
+```{r all code, eval = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=12, fig.height=5)
+# libraries
+if (!require(xtable)){
+  install.packages("xtable")
+  library("xtable")
+}
+
+# read in data
+#setwd("~/Desktop/36617/project1")
+data <- read.csv("sesame.txt")
+rows<-nrow(data)
+cols<-ncol(data)
+
+# helper functions
+get.colors <- function(n.colors){
+  colors <- c("#00A676", "#3691A7", "#882B3A", "#786F92", "#FCD0A1", "#40E3C7", "#E85858", "#1DB0C4")
+  return(colors[1:n.colors])
+}
+
+palette(get.colors(8))
+
+panel.cor <- function(x, y, digits=2, cex.cor)
+{
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  r <- cor(x, y)
+  txt <- format(c(r, 0.123456789), digits=digits)[1]
+  text(0.5, 0.5, paste("r = ",txt), cex=2)
+}
+
+
+# create freq, pretest, posttest and change vars
+data$freq <- as.numeric(data$viewcat >= 3) 
+data$pretest <- data$prenumb + data$prelet + 
+  data$preform + data$preclasf + data$prerelat + data$prebody
+data$posttest <- data$postnumb + data$postlet + 
+  data$postform + data$postclasf + data$postrelat + data$postbody
+data$change <- data$posttest - data$pretest
+
+# plot pretest scores
+plot(x = 1:rows, y = data$pretest, 
+     xlab = "Subject ID", ylab = "Pretest Score (sum)",
+     main = "Pretest Scores by Site",
+     pch = 16, col = data$site)
+legend(x = 120, y = 200, 
+       legend = c("Disadvantaged Inner City", "Advantaged Suburban",
+                  "Advantaged Rural","Disadvantaged Rural", "Disadvantaged Spanish Speaking"), 
+       col = c(palette()[3],palette()[2], palette()[1], palette()[4], palette()[5]),
+       lty=1, cex=.8, lwd=3)
+
+# pairs plot to compare correlation
+pairs(data[c("age", "pretest")],upper.panel=panel.smooth, lower.panel = panel.cor,main="Correlation between age and pretest")
+
+# separate age groups and advantages
+data$agegroup = as.numeric(data$age > median(data$age))
+q1.older <- quantile(data$pretest[data$agegroup == 1])[2]
+q1.younger <- quantile(data$pretest[data$agegroup == 0])[2]
+data$adv[data$agegroup == 1] = as.numeric(data$pretest[data$agegroup == 1] > q1.older)
+data$adv[data$agegroup == 0] = as.numeric(data$pretest[data$agegroup == 0] > q1.younger)
+
+# plot pretest score by age/advantage
+plot(x = data$age, y = data$pretest, 
+     xlab = "Age", ylab = "Pretest Score (sum)",
+     main = "Pretest Scores by Age and Advantage",
+     pch = 17 - data$agegroup, col = data$adv + 2)
+legend(x = 34, y = 200, 
+       legend = c("Advantaged Older", "Advantaged Younger", "Disadvantaged Older", "Disadvantaged Younger"), 
+       col = c(palette()[3],palette()[3],palette()[2],palette()[2]),
+       lty=0, cex=1, lwd=3, pch = c(16, 17, 16, 17))
+
+# find bad data
+find.bad.scores <- function(cols, max.points, data = data){
+  
+  result <- c()
+  
+  for (i in 1:length(cols)){
+  
+      precol <- paste("pre", cols[i],sep="")
+      postcol <- paste("post", cols[i],sep="")
+      bad.pts <- which(data[precol] > max.points[i] | data[postcol] > max.points[i])
+      if (length(bad.pts) > 0){
+        result <- append(result, bad.pts)
+      }
+  }
+  
+  return(result)
+}
+
+test.names <- c("body", "form", "let", "numb", "relat")
+max.pts <- c(32, 20, 58, 54, 17)
+bad.score.pts <- find.bad.scores(test.names, max.pts, data = data)
+more.bad.pts <- which(data$change < -35)
+to.remove <- append(bad.score.pts, more.bad.pts)
+
+# remove the bad data
+old.data <- data
+data <- data[-to.remove, ]
+
+# create groups of interest
+
+older.disadv.freq <- data$agegroup == 1 & data$adv == 0 & data$freq == 1
+older.disadv.nonfreq <- data$agegroup == 1 & data$adv == 0 & data$freq == 0
+older.adv.freq <- data$agegroup == 1 & data$adv == 1 & data$freq == 1
+older.adv.nonfreq <- data$agegroup == 1 & data$adv == 1 & data$freq == 0
+
+younger.disadv.freq <- data$agegroup == 0 & data$adv == 0 & data$freq == 1
+younger.disadv.nonfreq <- data$agegroup == 0 & data$adv == 0 & data$freq == 0
+younger.adv.freq <- data$agegroup == 0 & data$adv == 1 & data$freq == 1
+younger.adv.nonfreq <- data$agegroup == 0 & data$adv == 1 & data$freq == 0
+
+# check assumptions
+par(mfrow = c(2, 4))
+hist(data$change[older.disadv.freq], col = 1, main = "Change in Score (Older - Disadv - Freq)", xlab = "Change")
+hist(data$change[older.disadv.nonfreq], col = 2, main = "Change in Score (Older - Disadv - NonFreq)", xlab = "Change")
+hist(data$change[older.adv.freq], col = 3, main = "Change in Score (Older - Adv - Freq)", xlab = "Change")
+hist(data$change[older.adv.nonfreq], col = 4, main = "Change in Score (Older - Adv - NonFreq)", xlab = "Change")
+nrow(data[older.adv.nonfreq,])
+nrow(data[older.disadv.nonfreq,])
+nrow(data[older.adv.freq,])
+nrow(data[older.disadv.freq,])
+
+hist(data$change[younger.disadv.freq], col = 1, main = "Change in Score (Younger - Disadv - Freq)", xlab = "Change")
+hist(data$change[younger.disadv.nonfreq], col = 2, main = "Change in Score (Younger - Disadv - NonFreq)", xlab = "Change")
+hist(data$change[younger.adv.freq], col = 3, main = "Change in Score (Younger - Adv - Freq)", xlab = "Change")
+hist(data$change[younger.adv.nonfreq], col = 4, main = "Change in Score (Younger - Adv - NonFreq)", xlab = "Change")
+nrow(data[younger.adv.nonfreq,])
+nrow(data[younger.disadv.nonfreq,])
+nrow(data[younger.adv.freq,])
+nrow(data[younger.disadv.freq,])
+
+# calculate means
+older.mean.freq.dis <- round(mean(data$change[older.disadv.freq]), 2)
+older.mean.nonfreq.dis <- round(mean(data$change[older.disadv.nonfreq]), 2)
+older.mean.freq.adv <- round(mean(data$change[older.adv.freq]), 2)
+older.mean.nonfreq.adv <- round(mean(data$change[older.adv.nonfreq]), 2)
+
+older.mean.freq.dis.pre <- round(mean(data$pretest[older.disadv.freq]), 2)
+older.mean.nonfreq.dis.pre <- round(mean(data$pretest[older.disadv.nonfreq]), 2)
+older.mean.freq.adv.pre <- round(mean(data$pretest[older.adv.freq]), 2)
+older.mean.nonfreq.adv.pre <- round(mean(data$pretest[older.adv.nonfreq]), 2)
+
+older.mean.freq.dis.post <- round(mean(data$posttest[older.disadv.freq]), 2)
+older.mean.nonfreq.dis.post <- round(mean(data$posttest[older.disadv.nonfreq]), 2)
+older.mean.freq.adv.post <- round(mean(data$posttest[older.adv.freq]), 2)
+older.mean.nonfreq.adv.post <- round(mean(data$posttest[older.adv.nonfreq]), 2)
+
+
+# test disadv vs every other variable
+t.test(data$change[older.disadv.freq], data$change[older.adv.nonfreq], alternative = "greater")
+t.test(data$change[older.disadv.freq], data$change[older.adv.freq], alternative = "greater")
+t.test(data$change[older.disadv.freq], data$change[older.disadv.nonfreq], alternative = "greater")
+
+# calculate means
+younger.mean.freq.dis <- round(mean(data$change[younger.disadv.freq]), 2)
+younger.mean.nonfreq.dis <- round(mean(data$change[younger.disadv.nonfreq]), 2)
+younger.mean.freq.adv <- round(mean(data$change[younger.adv.freq]), 2)
+younger.mean.nonfreq.adv <- round(mean(data$change[younger.adv.nonfreq]), 2)
+
+younger.mean.freq.dis.pre <- round(mean(data$pretest[younger.disadv.freq]), 2)
+younger.mean.nonfreq.dis.pre <- round(mean(data$pretest[younger.disadv.nonfreq]), 2)
+younger.mean.freq.adv.pre <- round(mean(data$pretest[younger.adv.freq]), 2)
+younger.mean.nonfreq.adv.pre <- round(mean(data$pretest[younger.adv.nonfreq]), 2)
+
+younger.mean.freq.dis.post <- round(mean(data$posttest[younger.disadv.freq]), 2)
+younger.mean.nonfreq.dis.post <- round(mean(data$posttest[younger.disadv.nonfreq]), 2)
+younger.mean.freq.adv.post <- round(mean(data$posttest[younger.adv.freq]), 2)
+younger.mean.nonfreq.adv.post <- round(mean(data$posttest[younger.adv.nonfreq]), 2)
+
+# test disadv vs every other variable
+t.test(data$change[younger.disadv.freq], data$change[younger.adv.nonfreq], alternative = "greater")
+t.test(data$change[younger.disadv.freq], data$change[younger.adv.freq], alternative = "greater")
+t.test(data$change[younger.disadv.freq], data$change[younger.disadv.nonfreq], alternative = "greater")
+
+# plot bar plots and scatterplots with error bars
+par(mfrow = c(1,2))
+comparison.matrix.older <-
+  t(matrix(c(older.mean.freq.dis,older.mean.freq.dis,older.mean.freq.dis,
+             older.mean.freq.adv, older.mean.nonfreq.adv, older.mean.nonfreq.dis),
+           ncol = 2))
+barplot(comparison.matrix.older, beside = TRUE, 
+        col = c(palette()[3], palette()[1], palette()[3], palette()[2],palette()[3], palette()[4]),
+        names.arg = c("3 vs 1", "3 vs 2", "3 vs 4"),
+        ylab = "Change in Scores (posttest - pretest)",
+        main = "Older Children")
+
+comparison.matrix.younger <-
+  t(matrix(c(younger.mean.freq.dis,younger.mean.freq.dis,younger.mean.freq.dis,
+             younger.mean.freq.adv, younger.mean.nonfreq.adv, younger.mean.nonfreq.dis),
+           ncol = 2))
+barplot(comparison.matrix.younger, beside = TRUE,
+        col = c(palette()[3], palette()[1], palette()[3], palette()[2],palette()[3], palette()[4]),
+        names.arg = c("7 vs 5", "7 vs 6", "7 vs 8"), 
+        ylab = "Change in Scores (posttest - pretest)",
+        main = "Younger Children")
+
+
+par(mfrow = c(1,2))
+data$group[older.adv.freq] = 1
+data$group[older.adv.nonfreq] = 2
+data$group[older.disadv.freq] = 3
+data$group[older.disadv.nonfreq] = 4
+data$group[younger.adv.freq] = 5
+data$group[younger.adv.nonfreq] = 6
+data$group[younger.disadv.freq] = 7
+data$group[younger.disadv.nonfreq] = 8
+older.group <- data[data$group <= 4,]
+younger.group <-data[data$group >= 5, ]
+plot(x = older.group$group,
+     y = older.group$change,
+     col = older.group$group, 
+     pch = 16,
+     main = "Change by Group Number (Older)",
+     xlab = "", ylab = "", axes = FALSE)
+axis(side=1, at=1:4, labels=c("1","2","3","4"))
+axis(side=2, at=seq(-60,90,5))
+older.mean.vec <- c(mean(older.group$change[older.group$group == 1]),
+                    mean(older.group$change[older.group$group == 2]),
+                    mean(older.group$change[older.group$group == 3]),
+                    mean(older.group$change[older.group$group == 4])
+              )
+older.sd.vec <- c(
+  sd(older.group$change[older.group$group == 1]) / 
+    sqrt(length(older.group$change[older.group$group == 1])),
+  sd(older.group$change[older.group$group == 2]) / 
+    sqrt(length(older.group$change[older.group$group == 2])),
+  sd(older.group$change[older.group$group == 3]) / 
+    sqrt(length(older.group$change[older.group$group == 3])),
+  sd(older.group$change[older.group$group == 4]) / 
+    sqrt(length(older.group$change[older.group$group == 4]))
+  )
+points(1:4, older.mean.vec, pch=15, col="#FFF519",cex = 1.5)
+arrows(x0=1:4, y0=older.mean.vec-older.sd.vec, y1=older.mean.vec+older.sd.vec, code=3, angle=90, length = 1)
+
+plot(x = younger.group$group,
+     y = younger.group$change,
+     col = younger.group$group - 4, 
+     pch = 16,
+     main = "Change by Group Number (Younger)",
+     xlab = "", ylab = "", axes = FALSE)
+axis(side=1, at=5:8, labels=c("5","6","7","8"))
+axis(side=2, at=seq(-70,110,5))
+younger.mean.vec <- c(mean(younger.group$change[younger.group$group == 5]),
+                    mean(younger.group$change[younger.group$group == 6]),
+                    mean(younger.group$change[younger.group$group == 7]),
+                    mean(younger.group$change[younger.group$group == 8])
+              )
+younger.sd.vec <- c(
+  sd(younger.group$change[younger.group$group == 5]) / 
+    sqrt(length(younger.group$change[younger.group$group == 5])),
+  sd(younger.group$change[younger.group$group == 6]) / 
+    sqrt(length(younger.group$change[younger.group$group == 6])),
+  sd(younger.group$change[younger.group$group == 7]) / 
+    sqrt(length(younger.group$change[younger.group$group == 7])),
+  sd(younger.group$change[younger.group$group == 8] / 
+    sqrt(length(younger.group$change[younger.group$group == 8])))
+              )
+points(5:8, younger.mean.vec, pch=15, col="#FFF519",cex = 1.5)
+arrows(x0=5:8, y0=younger.mean.vec-younger.sd.vec, y1=younger.mean.vec+younger.sd.vec, code=3, angle=90, length = 1)
+```
+
+
+
